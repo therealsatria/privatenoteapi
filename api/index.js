@@ -1,25 +1,53 @@
 import { neon } from '@neondatabase/serverless';
 
+// Variable flag di RAM untuk mencegah query CREATE TABLE berjalan berulang kali pada warm request
+let isTableInitialized = false;
+
+/**
+ * Fungsi untuk membuat tabel otomatis jika belum ada di database Neon
+ */
+async function ensureTableExists(sql) {
+  if (isTableInitialized) return;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS notes (
+      id SERIAL PRIMARY KEY,
+      encrypted_title TEXT NOT NULL,
+      encrypted_body TEXT NOT NULL,
+      iv TEXT NOT NULL,
+      tags TEXT,
+      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+  `;
+
+  isTableInitialized = true;
+}
+
 export default async function handler(req, res) {
-  // 1. Pengaturan Header CORS
+  // 1. Header CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
 
-  // Tangani Request Preflight OPTIONS dari Browser
+  // Preflight OPTIONS Request
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
-  // 2. Inisialisasi Koneksi Neon (Mengambil Connection String dari Vercel Environment Variable)
+  // 2. Inisialisasi Koneksi Neon
   const sql = neon(process.env.DATABASE_URL);
 
-  // 3. Ambil parameter 'action' dan 'id' dari Query URL atau Body Request
-  const { action, id: queryId } = req.query || {};
-  const body = req.body || {};
-  const targetId = queryId || body.id;
-
   try {
+    // 3. Jalankan Auto-Inisialisasi Tabel (Hanya jika tabel belum ada)
+    await ensureTableExists(sql);
+
+    // Ambil parameter action & id
+    const { action, id: queryId } = req.query || {};
+    const body = req.body || {};
+    const targetId = queryId || body.id;
+
+    // 4. Router Utama API
     switch (action) {
 
       // GET /api?action=get_notes
@@ -77,17 +105,19 @@ export default async function handler(req, res) {
           return res.status(400).json({ status: 'error', message: 'Payload incomplete' });
         }
 
+        // update_note langsung memperbarui kolom updated_at ke waktu saat ini (NOW())
         const updated = await sql`
           UPDATE notes
           SET encrypted_title = ${encrypted_title},
               encrypted_body = ${encrypted_body},
               iv = ${iv},
-              tags = ${tags || null}
+              tags = ${tags || null},
+              updated_at = NOW()
           WHERE id = ${targetId}
           RETURNING id
         `;
 
-        if (updated.length === 0) return res.status(404).json({ status: 'error', message: 'Note not found or no changes made' });
+        if (updated.length === 0) return res.status(404).json({ status: 'error', message: 'Note not found' });
         return res.status(200).json({ status: 'success', message: 'Note updated', data: { id: targetId } });
       }
 
