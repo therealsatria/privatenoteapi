@@ -1,2 +1,480 @@
-// Ubah konstanta API_URL menjadi endpoint Vercel Serverless Function:
-const API_URL = '/api';
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Private Notes - Zero-Knowledge Vault</title>
+</head>
+<body>
+
+    <h1>Private Notes (Zero-Knowledge Vault)</h1>
+
+    <!-- ==================================================================== -->
+    <!-- 1. FORM UNLOCK PASSPHRASE (DITAMPILKAN SAAT VAULT TERKUNCI)           -->
+    <!-- ==================================================================== -->
+    <div id="lock-section">
+        <fieldset>
+            <legend><strong>Vault Terkunci</strong></legend>
+            <p>Masukkan Secret Key / Passphrase Anda untuk membuka dan mendekripsi catatan:</p>
+            <form onsubmit="handleUnlock(event)">
+                <label for="passphrase-input">Passphrase / Key:</label>
+                <input type="password" id="passphrase-input" placeholder="Masukkan Passphrase..." required style="width: 300px;">
+                <button type="submit">Set Key / Unlock</button>
+            </form>
+        </fieldset>
+    </div>
+
+    <!-- ==================================================================== -->
+    <!-- 2. APLIKASI UTAMA (DITAMPILKAN SAAT VAULT TERBUKA)                   -->
+    <!-- ==================================================================== -->
+    <div id="app-section" style="display: none;">
+        
+        <!-- Status & Kontrol Sesi Passphrase -->
+        <fieldset>
+            <legend><strong>Status Sesi Vault</strong></legend>
+            <p>Status: <strong style="color: green;">Vault Terbuka (Unlocked)</strong></p>
+            <button type="button" onclick="handleChangeKey()">Change Key</button>
+            <button type="button" onclick="handleLock()">Lock / Release Key</button>
+        </fieldset>
+
+        <br>
+
+        <!-- Form Editor Catatan (Tambah / Edit) -->
+        <fieldset>
+            <legend><strong id="form-legend">Buat Catatan Baru</strong></legend>
+            <form id="note-form" onsubmit="handleSaveNote(event)">
+                <input type="hidden" id="note-id" value="">
+                
+                <div>
+                    <label for="note-title">Judul Catatan:</label><br>
+                    <input type="text" id="note-title" placeholder="Judul rahasia..." required style="width: 100%; max-width: 500px;">
+                </div>
+                <br>
+                <div>
+                    <label for="note-body">Isi Catatan:</label><br>
+                    <textarea id="note-body" rows="6" placeholder="Isi catatan rahasia..." required style="width: 100%; max-width: 500px;"></textarea>
+                </div>
+                <br>
+                <div>
+                    <label for="note-tags">Tag (Opsional, pisahkan dengan koma):</label><br>
+                    <input type="text" id="note-tags" placeholder="pribadi, finansial" style="width: 100%; max-width: 500px;">
+                </div>
+                <br>
+                <button type="submit" id="btn-submit">Simpan Catatan</button>
+                <button type="button" onclick="resetForm()">Batal / Reset</button>
+            </form>
+        </fieldset>
+
+        <br>
+
+        <!-- Viewer Detail Catatan -->
+        <fieldset id="viewer-fieldset" style="display: none;">
+            <legend><strong>Detail Catatan (Viewer)</strong></legend>
+            <h3 id="view-title"></h3>
+            <p><strong>Tag:</strong> <span id="view-tags"></span> | <strong>Diperbarui:</strong> <span id="view-date"></span></p>
+            <hr>
+            <pre id="view-body" style="white-space: pre-wrap; font-family: inherit; background-color: #f4f4f4; padding: 10px;"></pre>
+            <button type="button" onclick="closeViewer()">Tutup Detail</button>
+        </fieldset>
+
+        <br>
+
+        <!-- Tabel Daftar Catatan -->
+        <fieldset>
+            <legend><strong>Daftar Catatan</strong></legend>
+            <table border="1" cellpadding="8" cellspacing="0" style="width: 100%; border-collapse: collapse; text-align: left;">
+                <thead>
+                    <tr style="background-color: #eee;">
+                        <th>ID</th>
+                        <th>Judul (Decrypted)</th>
+                        <th>Tags</th>
+                        <th>Diperbarui / Dibuat</th>
+                        <th>Aksi</th>
+                    </tr>
+                </thead>
+                <tbody id="notes-list">
+                    <!-- Data dirender dinamis -->
+                </tbody>
+            </table>
+        </fieldset>
+    </div>
+
+    <!-- ==================================================================== -->
+    <!-- 3. LOGIKA KRIPTOGRAFI & INTEGRASI API VERCEL                        -->
+    <!-- ==================================================================== -->
+    <script>
+        // Endpoint Vercel Serverless Function
+        const API_URL = '/api';
+        
+        // Key Kriptografi aktif di RAM & Cache Catatan
+        let currentCryptoKey = null;
+        let cachedNotes = [];
+
+        // ----------------------------------------------------------------------
+        // UTILITY FUNCTIONS (Base64 & HTML Escaping)
+        // ----------------------------------------------------------------------
+        function bufferToBase64(buf) {
+            let binary = '';
+            const bytes = new Uint8Array(buf);
+            for (let i = 0; i < bytes.byteLength; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            return window.btoa(binary);
+        }
+
+        function base64ToBuffer(base64) {
+            const binaryString = window.atob(base64);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        // ----------------------------------------------------------------------
+        // WEBCRYPTO API (AES-256-GCM + SHA-256 Key Derivation)
+        // ----------------------------------------------------------------------
+        async function deriveKeyFromPassphrase(passphrase) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(passphrase);
+            
+            // Hash passphrase dengan SHA-256 untuk dijadikan raw key 256-bit
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+
+            return await crypto.subtle.importKey(
+                'raw',
+                hashBuffer,
+                { name: 'AES-GCM' },
+                false,
+                ['encrypt', 'decrypt']
+            );
+        }
+
+        async function encryptText(plainText, key, customIv = null) {
+            const encoder = new TextEncoder();
+            // Mencegah Nonce Reuse dengan membuat 96-bit random IV acak baru
+            const iv = customIv || crypto.getRandomValues(new Uint8Array(12));
+            
+            const encryptedBuffer = await crypto.subtle.encrypt(
+                { name: 'AES-GCM', iv: iv },
+                key,
+                encoder.encode(plainText)
+            );
+
+            return {
+                ciphertext: bufferToBase64(encryptedBuffer),
+                iv: bufferToBase64(iv)
+            };
+        }
+
+        async function decryptText(ciphertextBase64, ivBase64, key) {
+            try {
+                const decoder = new TextDecoder();
+                const ciphertextBuffer = base64ToBuffer(ciphertextBase64);
+                const ivBuffer = base64ToBuffer(ivBase64);
+
+                const decryptedBuffer = await crypto.subtle.decrypt(
+                    { name: 'AES-GCM', iv: ivBuffer },
+                    key,
+                    ciphertextBuffer
+                );
+
+                return decoder.decode(decryptedBuffer);
+            } catch (err) {
+                console.error("Gagal mendekripsi payload:", err);
+                return "[Gagal Dekripsi: Passphrase Salah]";
+            }
+        }
+
+        async function encryptNotePayload(title, body, key) {
+            const ivTitleBytes = crypto.getRandomValues(new Uint8Array(12));
+            const ivBodyBytes = crypto.getRandomValues(new Uint8Array(12));
+
+            const encTitle = await encryptText(title, key, ivTitleBytes);
+            const encBody = await encryptText(body, key, ivBodyBytes);
+
+            // Gabungkan IV dengan pemisah '|'
+            const combinedIv = `${encTitle.iv}|${encBody.iv}`;
+
+            return {
+                encrypted_title: encTitle.ciphertext,
+                encrypted_body: encBody.ciphertext,
+                iv: combinedIv
+            };
+        }
+
+        async function decryptNotePayload(encTitle, encBody, ivString, key) {
+            let ivTitle, ivBody;
+
+            if (ivString && ivString.includes('|')) {
+                const parts = ivString.split('|');
+                ivTitle = parts[0];
+                ivBody = parts[1];
+            } else {
+                ivTitle = ivString;
+                ivBody = ivString;
+            }
+
+            const title = await decryptText(encTitle, ivTitle, key);
+            const body = await decryptText(encBody, ivBody, key);
+
+            return { title, body };
+        }
+
+        // ----------------------------------------------------------------------
+        // MANAJEMEN SESI & VAULT STATE
+        // ----------------------------------------------------------------------
+        async function initApp() {
+            const storedPassphrase = sessionStorage.getItem('private_notes_passphrase');
+            
+            if (storedPassphrase) {
+                try {
+                    currentCryptoKey = await deriveKeyFromPassphrase(storedPassphrase);
+                    showUnlockedUI();
+                    await fetchAndRenderNotes();
+                } catch (err) {
+                    console.error("Inisialisasi vault gagal:", err);
+                    handleLock();
+                }
+            } else {
+                showLockedUI();
+            }
+        }
+
+        async function handleUnlock(event) {
+            if (event) event.preventDefault();
+            const input = document.getElementById('passphrase-input').value.trim();
+            if (!input) {
+                alert("Passphrase wajib diisi!");
+                return;
+            }
+
+            sessionStorage.setItem('private_notes_passphrase', input);
+            document.getElementById('passphrase-input').value = '';
+            
+            await initApp();
+        }
+
+        function handleLock() {
+            sessionStorage.removeItem('private_notes_passphrase');
+            currentCryptoKey = null;
+            cachedNotes = [];
+            
+            resetForm();
+            closeViewer();
+            showLockedUI();
+        }
+
+        async function handleChangeKey() {
+            const newKey = prompt("Masukkan Secret Key / Passphrase baru:");
+            if (newKey && newKey.trim() !== '') {
+                sessionStorage.setItem('private_notes_passphrase', newKey.trim());
+                currentCryptoKey = await deriveKeyFromPassphrase(newKey.trim());
+                alert("Passphrase aktif diperbarui untuk sesi ini!");
+                await fetchAndRenderNotes();
+            }
+        }
+
+        function showLockedUI() {
+            document.getElementById('lock-section').style.display = 'block';
+            document.getElementById('app-section').style.display = 'none';
+        }
+
+        function showUnlockedUI() {
+            document.getElementById('lock-section').style.display = 'none';
+            document.getElementById('app-section').style.display = 'block';
+        }
+
+        // ----------------------------------------------------------------------
+        // INTERAKSI API VERCEL (FETCH) & CRUD
+        // ----------------------------------------------------------------------
+        async function fetchAndRenderNotes() {
+            const tbody = document.getElementById('notes-list');
+            tbody.innerHTML = '<tr><td colspan="5">Memuat dan mendekripsi data...</td></tr>';
+
+            try {
+                const response = await fetch(`${API_URL}?action=get_notes`);
+                if (!response.ok) throw new Error('Gagal mengambil data dari API Vercel');
+
+                const result = await response.json();
+                const notes = result.data || [];
+                cachedNotes = notes;
+                
+                tbody.innerHTML = '';
+
+                if (notes.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5">Belum ada catatan terenkripsi yang tersimpan.</td></tr>';
+                    return;
+                }
+
+                for (let i = 0; i < notes.length; i++) {
+                    const note = notes[i];
+                    
+                    const decryptedData = await decryptNotePayload(
+                        note.encrypted_title,
+                        note.encrypted_body,
+                        note.iv,
+                        currentCryptoKey
+                    );
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${note.id}</td>
+                        <td>${escapeHtml(decryptedData.title)}</td>
+                        <td>${escapeHtml(note.tags || '-')}</td>
+                        <td>${escapeHtml(note.updated_at || note.created_at || '-')}</td>
+                        <td>
+                            <button type="button" onclick="readNote(${i})">[Baca]</button>
+                            <button type="button" onclick="editNote(${i})">[Edit]</button>
+                            <button type="button" onclick="deleteNote(${note.id})">[Hapus]</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                }
+            } catch (err) {
+                console.error(err);
+                tbody.innerHTML = `<tr><td colspan="5" style="color: red;">Error: ${err.message}</td></tr>`;
+            }
+        }
+
+        async function handleSaveNote(event) {
+            event.preventDefault();
+            
+            const id = document.getElementById('note-id').value;
+            const title = document.getElementById('note-title').value.trim();
+            const body = document.getElementById('note-body').value.trim();
+            const tags = document.getElementById('note-tags').value.trim();
+
+            if (!title || !body) {
+                alert("Judul dan Isi Catatan wajib diisi!");
+                return;
+            }
+
+            try {
+                // Enkripsi data di browser
+                const encryptedPayload = await encryptNotePayload(title, body, currentCryptoKey);
+
+                const payload = {
+                    encrypted_title: encryptedPayload.encrypted_title,
+                    encrypted_body: encryptedPayload.encrypted_body,
+                    iv: encryptedPayload.iv,
+                    tags: tags
+                };
+
+                let action = 'create_note';
+                if (id) {
+                    payload.id = id;
+                    action = 'update_note';
+                }
+
+                const response = await fetch(`${API_URL}?action=${action}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                if (!response.ok || result.status === 'error') {
+                    throw new Error(result.message || "Gagal menyimpan catatan.");
+                }
+
+                alert("Catatan berhasil disimpan dalam bentuk terenkripsi!");
+                resetForm();
+                await fetchAndRenderNotes();
+            } catch (err) {
+                alert("Terjadi kesalahan: " + err.message);
+            }
+        }
+
+        async function readNote(index) {
+            const note = cachedNotes[index];
+            if (!note) return;
+
+            const decrypted = await decryptNotePayload(
+                note.encrypted_title,
+                note.encrypted_body,
+                note.iv,
+                currentCryptoKey
+            );
+
+            document.getElementById('view-title').textContent = decrypted.title;
+            document.getElementById('view-body').textContent = decrypted.body;
+            document.getElementById('view-tags').textContent = note.tags || '-';
+            document.getElementById('view-date').textContent = note.updated_at || note.created_at || '-';
+            
+            document.getElementById('viewer-fieldset').style.display = 'block';
+            window.scrollTo({ top: document.getElementById('viewer-fieldset').offsetTop, behavior: 'smooth' });
+        }
+
+        function closeViewer() {
+            document.getElementById('viewer-fieldset').style.display = 'none';
+        }
+
+        async function editNote(index) {
+            const note = cachedNotes[index];
+            if (!note) return;
+
+            const decrypted = await decryptNotePayload(
+                note.encrypted_title,
+                note.encrypted_body,
+                note.iv,
+                currentCryptoKey
+            );
+
+            document.getElementById('note-id').value = note.id;
+            document.getElementById('note-title').value = decrypted.title;
+            document.getElementById('note-body').value = decrypted.body;
+            document.getElementById('note-tags').value = note.tags || '';
+
+            document.getElementById('form-legend').textContent = `Edit Catatan (ID: ${note.id})`;
+            document.getElementById('btn-submit').textContent = "Perbarui Catatan";
+            
+            window.scrollTo({ top: document.getElementById('note-form').offsetTop, behavior: 'smooth' });
+        }
+
+        async function deleteNote(id) {
+            if (!confirm(`Apakah Anda yakin ingin menghapus catatan ID ${id}?`)) return;
+
+            try {
+                const response = await fetch(`${API_URL}?action=delete_note`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: id })
+                });
+
+                const result = await response.json();
+                if (!response.ok || result.status === 'error') {
+                    throw new Error(result.message || "Gagal menghapus catatan.");
+                }
+
+                alert("Catatan berhasil dihapus.");
+                await fetchAndRenderNotes();
+            } catch (err) {
+                alert("Error: " + err.message);
+            }
+        }
+
+        function resetForm() {
+            document.getElementById('note-id').value = '';
+            document.getElementById('note-title').value = '';
+            document.getElementById('note-body').value = '';
+            document.getElementById('note-tags').value = '';
+            document.getElementById('form-legend').textContent = "Buat Catatan Baru";
+            document.getElementById('btn-submit').textContent = "Simpan Catatan";
+        }
+
+        // Jalankan aplikasi saat dokumen selesai dimuat
+        document.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>
