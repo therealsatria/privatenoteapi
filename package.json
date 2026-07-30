@@ -1,0 +1,9 @@
+{
+  "name": "private-notes-zero-knowledge",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "@neondatabase/serverless": "^0.9.0"
+  }
+}
