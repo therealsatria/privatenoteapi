@@ -3,7 +3,7 @@
 const API_URL = '/api';
 
 /**
- * PING Endpoint: Memeriksa latensi API, mendapatkan IP Address & Region
+ * PING Endpoint: Memeriksa latensi API, mendapatkan IP Address, Region, & Hostname
  */
 export async function pingApi() {
     const response = await fetch(`${API_URL}?action=ping`);
@@ -11,6 +11,21 @@ export async function pingApi() {
     const result = await response.json();
     if (result.status === 'error') throw new Error(result.message);
     return result.data;
+}
+
+/**
+ * Mencatat Aktivitas Vault (SET_KEY, CHANGE_KEY, RELEASE_KEY) ke Backend
+ */
+export async function logVaultEventApi(eventType) {
+    try {
+        await fetch(`${API_URL}?action=log_vault_event`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ event_type: eventType })
+        });
+    } catch (err) {
+        console.error("Gagal mengirim log vault event:", err);
+    }
 }
 
 /**
@@ -73,7 +88,7 @@ export async function deleteNoteApi(id) {
 }
 
 /**
- * Mengambil N log aktivitas terbaru
+ * Mengambil N log aktivitas terbaru + total count
  */
 export async function fetchLogsApi(limit = 3) {
     const response = await fetch(`${API_URL}?action=get_logs&limit=${limit}`);

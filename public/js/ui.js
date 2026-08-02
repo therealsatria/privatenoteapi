@@ -172,7 +172,7 @@ export function setViewerData(note) {
 }
 
 /**
- * Merender Baris Tabel Log Aktivitas (Max LOG_LIMIT baris) & Informasi Total
+ * Merender Baris Tabel Log Aktivitas (Max LOG_LIMIT baris) + Hostname/Device + Total Count
  */
 export function renderLogsTable(logs, totalCount = 0) {
     const tbody = document.getElementById('logs-list');
@@ -184,7 +184,7 @@ export function renderLogsTable(logs, totalCount = 0) {
     }
 
     if (!logs || logs.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4">Belum ada log aktivitas tersimpan.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5">Belum ada log aktivitas tersimpan.</td></tr>';
         return;
     }
 
@@ -194,6 +194,7 @@ export function renderLogsTable(logs, totalCount = 0) {
             <td>${escapeHtml(log.created_at || '-')}</td>
             <td><strong>${escapeHtml(log.action_type)}</strong></td>
             <td><code>${log.note_id ? escapeHtml(log.note_id) : '-'}</code></td>
+            <td>${escapeHtml(log.hostname || 'Unknown Device')}</td>
             <td>${escapeHtml(log.ip_address || '-')} (${escapeHtml(log.region || 'Local')})</td>
         `;
         tbody.appendChild(tr);

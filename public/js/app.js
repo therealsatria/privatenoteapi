@@ -8,7 +8,8 @@ import {
     deleteNoteApi, 
     pingApi, 
     fetchLogsApi, 
-    clearLogsApi 
+    clearLogsApi,
+    logVaultEventApi
 } from './api.js';
 
 import { 
@@ -69,7 +70,7 @@ async function initApp() {
     }
 }
 
-// Vault Locking & Session Management
+// Vault Locking & Session Management (Dengan Logging Aktivitas Sesi)
 async function handleUnlock(event) {
     if (event) event.preventDefault();
     const input = document.getElementById('passphrase-input').value.trim();
@@ -77,10 +78,17 @@ async function handleUnlock(event) {
 
     sessionStorage.setItem('private_notes_passphrase', input);
     document.getElementById('passphrase-input').value = '';
+    
+    // Catat Event SET_KEY ke Log Backend
+    await logVaultEventApi('SET_KEY');
+    
     await initApp();
 }
 
-function handleLock() {
+async function handleLock() {
+    // Catat Event RELEASE_KEY sebelum sesi RAM dibersihkan
+    await logVaultEventApi('RELEASE_KEY');
+
     sessionStorage.removeItem('private_notes_passphrase');
     currentCryptoKey = null;
     cachedNotes = [];
@@ -96,8 +104,13 @@ async function handleChangeKey() {
     if (newKey && newKey.trim() !== '') {
         sessionStorage.setItem('private_notes_passphrase', newKey.trim());
         currentCryptoKey = await deriveKeyFromPassphrase(newKey.trim());
+        
+        // Catat Event CHANGE_KEY ke Log Backend
+        await logVaultEventApi('CHANGE_KEY');
+        
         alert("Passphrase aktif diperbarui!");
         await fetchAndRenderNotes();
+        await fetchAndRenderLogs();
     }
 }
 
@@ -282,7 +295,7 @@ async function handleSaveNote(exitAfterSave = false) {
         alert(exitAfterSave ? "Catatan tersimpan! Menutup editor..." : "Draft catatan berhasil disimpan (Apply)!");
 
         await fetchAndRenderNotes();
-        await fetchAndRenderLogs(); // Refresh log otomatis setelah simpan
+        await fetchAndRenderLogs();
 
         if (exitAfterSave) {
             switchMode('LIST');
@@ -306,7 +319,7 @@ async function deleteSelectedNote() {
         alert("Catatan berhasil dihapus.");
         switchMode('LIST');
         await fetchAndRenderNotes();
-        await fetchAndRenderLogs(); // Refresh log otomatis setelah hapus
+        await fetchAndRenderLogs();
     } catch (err) {
         alert("Error: " + err.message);
     }
@@ -346,11 +359,10 @@ function startRealtimeClock() {
     };
 
     updateMetrics();
-    clockTimer = setInterval(updateMetrics, 200); // Update halus realtime
+    clockTimer = setInterval(updateMetrics, 200);
 }
 
 async function executePing() {
-    // Jalankan PING hanya jika tab browser sedang aktif dibuka
     if (document.visibilityState && document.visibilityState !== 'visible') return;
 
     const startTime = performance.now();
@@ -374,9 +386,9 @@ async function executePing() {
 }
 
 function startPeriodicPing() {
-    executePing(); // Ping awal saat pertama load
+    executePing();
     if (pingTimer) clearInterval(pingTimer);
-    pingTimer = setInterval(executePing, 15000); // Periodic ping setiap 15 detik (Hemat kuota Vercel)
+    pingTimer = setInterval(executePing, 15000);
 }
 
 // Global Event Listeners Setup
@@ -391,10 +403,8 @@ function setupEventListeners() {
     document.getElementById('btn-prev-page').addEventListener('click', () => changePage(-1));
     document.getElementById('btn-next-page').addEventListener('click', () => changePage(1));
 
-    // Clear Logs Button Listener
     document.getElementById('btn-clear-logs').addEventListener('click', handleClearLogs);
 
-    // Event Listener Resize untuk Update Resolusi Viewport
     window.addEventListener('resize', () => {
         const viewportRes = `${window.innerWidth}x${window.innerHeight} px`;
         const screenRes = `${window.screen.width}x${window.screen.height} px`;
@@ -402,7 +412,6 @@ function setupEventListeners() {
         if (elRes) elRes.textContent = `${viewportRes} (Screen: ${screenRes})`;
     });
 
-    // Event Delegation untuk Tombol Pilih di Baris Tabel Catatan
     document.getElementById('notes-list').addEventListener('click', (e) => {
         const btn = e.target.closest('.btn-select-row');
         if (btn) {
@@ -411,7 +420,6 @@ function setupEventListeners() {
         }
     });
 
-    // Event Delegation untuk Tombol Dinamis di Top Navbar
     document.getElementById('navbar-buttons').addEventListener('click', (e) => {
         const id = e.target.id;
         if (id === 'btn-nav-new') openNewNoteEditor();
