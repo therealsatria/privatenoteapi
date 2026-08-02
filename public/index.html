@@ -4,14 +4,49 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Private Notes - Zero-Knowledge Vault</title>
+    <style>
+        /* CSS Minimalis untuk Floating Action Navbar */
+        #floating-navbar {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: #222;
+            color: #fff;
+            padding: 12px 18px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        #floating-navbar button {
+            cursor: pointer;
+            padding: 6px 12px;
+            font-weight: bold;
+        }
+        .pagination-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+        }
+        .filter-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .active-row {
+            background-color: #e6f7ff;
+        }
+    </style>
 </head>
 <body>
 
     <h1>Private Notes (Zero-Knowledge Vault)</h1>
 
-    <!-- ==================================================================== -->
-    <!-- 1. FORM UNLOCK PASSPHRASE (DITAMPILKAN SAAT VAULT TERKUNCI)           -->
-    <!-- ==================================================================== -->
+    <!-- 1. UNLOCK VAULT FORM -->
     <div id="lock-section">
         <fieldset>
             <legend><strong>Vault Terkunci</strong></legend>
@@ -24,12 +59,10 @@
         </fieldset>
     </div>
 
-    <!-- ==================================================================== -->
-    <!-- 2. APLIKASI UTAMA (DITAMPILKAN SAAT VAULT TERBUKA)                   -->
-    <!-- ==================================================================== -->
+    <!-- 2. UTAMA APLIKASI -->
     <div id="app-section" style="display: none;">
         
-        <!-- Status & Kontrol Sesi Passphrase -->
+        <!-- Status Sesi Vault -->
         <fieldset>
             <legend><strong>Status Sesi Vault</strong></legend>
             <p>Status: <strong style="color: green;">Vault Terbuka (Unlocked)</strong></p>
@@ -39,79 +72,114 @@
 
         <br>
 
-        <!-- Form Editor Catatan (Tambah / Edit) -->
-        <fieldset>
+        <!-- Form Editor Catatan -->
+        <fieldset id="editor-fieldset" style="display: none;">
             <legend><strong id="form-legend">Buat Catatan Baru</strong></legend>
-            <form id="note-form" onsubmit="handleSaveNote(event)">
+            <form id="note-form" onsubmit="event.preventDefault();">
                 <input type="hidden" id="note-id" value="">
                 
                 <div>
                     <label for="note-title">Judul Catatan:</label><br>
-                    <input type="text" id="note-title" placeholder="Judul rahasia..." required style="width: 100%; max-width: 1000px;">
+                    <input type="text" id="note-title" placeholder="Judul rahasia..." required style="width: 100%; max-width: 500px;">
                 </div>
                 <br>
                 <div>
                     <label for="note-body">Isi Catatan:</label><br>
-                    <textarea id="note-body" rows="24" placeholder="Isi catatan rahasia..." required style="width: 100%; max-width: 1000p;"></textarea>
+                    <textarea id="note-body" rows="8" placeholder="Isi catatan rahasia..." required style="width: 100%; max-width: 500px;"></textarea>
                 </div>
                 <br>
                 <div>
                     <label for="note-tags">Tag (Opsional, pisahkan dengan koma):</label><br>
-                    <input type="text" id="note-tags" placeholder="pribadi, finansial" style="width: 100%; max-width: 1000px;">
+                    <input type="text" id="note-tags" placeholder="pribadi, finansial" style="width: 100%; max-width: 500px;">
                 </div>
-                <br>
-                <button type="submit" id="btn-submit">Simpan Catatan</button>
-                <button type="button" onclick="resetForm()">Batal / Reset</button>
             </form>
         </fieldset>
 
-        <br>
+        <br id="editor-br" style="display: none;">
 
         <!-- Viewer Detail Catatan -->
         <fieldset id="viewer-fieldset" style="display: none;">
             <legend><strong>Detail Catatan (Viewer)</strong></legend>
             <h3 id="view-title"></h3>
             <p><strong>Tag:</strong> <span id="view-tags"></span> | <strong>Diperbarui:</strong> <span id="view-date"></span></p>
+            <p><strong>UUID:</strong> <code id="view-uuid"></code></p>
             <hr>
             <pre id="view-body" style="white-space: pre-wrap; font-family: inherit; background-color: #f4f4f4; padding: 10px;"></pre>
-            <button type="button" onclick="closeViewer()">Tutup Detail</button>
         </fieldset>
 
-        <br>
+        <br id="viewer-br" style="display: none;">
 
-        <!-- Tabel Daftar Catatan -->
-        <fieldset>
+        <!-- Tabel Daftar Catatan & Pencarian -->
+        <fieldset id="list-fieldset">
             <legend><strong>Daftar Catatan</strong></legend>
+            
+            <!-- Filter Title-Only & Pagination Size -->
+            <div class="filter-container">
+                <div>
+                    <label for="search-input"><strong>Cari Judul:</strong> </label>
+                    <input type="text" id="search-input" placeholder="Ketik kata kunci judul..." oninput="handleSearchInput()" style="width: 250px;">
+                    <button type="button" onclick="clearSearch()">Clear</button>
+                </div>
+                <div>
+                    <label for="items-per-page"><strong>Baris per halaman:</strong> </label>
+                    <select id="items-per-page" onchange="handleItemsPerPageChange()">
+                        <option value="10">10</option>
+                        <option value="30">30</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Tabel Data -->
             <table border="1" cellpadding="8" cellspacing="0" style="width: 100%; border-collapse: collapse; text-align: left;">
                 <thead>
                     <tr style="background-color: #eee;">
-                        <th>ID</th>
+                        <th style="width: 280px;">UUID (ID)</th>
                         <th>Judul (Decrypted)</th>
                         <th>Tags</th>
-                        <th>Diperbarui / Dibuat</th>
-                        <th>Aksi</th>
+                        <th style="width: 180px;">Diperbarui / Dibuat</th>
+                        <th style="width: 80px;">Pilih</th>
                     </tr>
                 </thead>
                 <tbody id="notes-list">
                     <!-- Data dirender dinamis -->
                 </tbody>
             </table>
+
+            <!-- Kontrol Pagination -->
+            <div class="pagination-container">
+                <button type="button" id="btn-prev-page" onclick="changePage(-1)">← Sebelumnya</button>
+                <span id="pagination-info">Halaman 1 dari 1</span>
+                <button type="button" id="btn-next-page" onclick="changePage(1)">Selanjutnya →</button>
+            </div>
         </fieldset>
     </div>
 
-    <!-- ==================================================================== -->
-    <!-- 3. LOGIKA KRIPTOGRAFI & INTEGRASI API VERCEL                        -->
-    <!-- ==================================================================== -->
+    <!-- 3. FLOATING ACTION NAVBAR (DYNAMIC CONTEXT-AWARE) -->
+    <div id="floating-navbar" style="display: none;">
+        <!-- Tombol akan dirender secara dinamis berdasarkan Mode -->
+    </div>
+
+    <!-- 4. LOGIKA JAVASCRIPT -->
     <script>
-        // Endpoint Vercel Serverless Function
         const API_URL = '/api';
         
-        // Key Kriptografi aktif di RAM & Cache Catatan
+        // App States
         let currentCryptoKey = null;
-        let cachedNotes = [];
+        let cachedNotes = [];       // Seluruh catatan terdekripsi
+        let filteredNotes = [];     // Catatan hasil filter pencarian judul
+        
+        let activeMode = 'LIST';    // Options: 'LIST', 'EDITING', 'VIEWING'
+        let selectedNoteIndex = null;
+        let originalFormData = { title: '', body: '', tags: '' }; // Untuk fitur Reset Form
+        
+        // Pagination States
+        let currentPage = 1;
+        let itemsPerPage = 10;
 
         // ----------------------------------------------------------------------
-        // UTILITY FUNCTIONS (Base64 & HTML Escaping)
+        // UTILS & KRIPTOGRAFI
         // ----------------------------------------------------------------------
         function bufferToBase64(buf) {
             let binary = '';
@@ -141,14 +209,9 @@
                 .replace(/'/g, '&#039;');
         }
 
-        // ----------------------------------------------------------------------
-        // WEBCRYPTO API (AES-256-GCM + SHA-256 Key Derivation)
-        // ----------------------------------------------------------------------
         async function deriveKeyFromPassphrase(passphrase) {
             const encoder = new TextEncoder();
             const data = encoder.encode(passphrase);
-            
-            // Hash passphrase dengan SHA-256 untuk dijadikan raw key 256-bit
             const hashBuffer = await crypto.subtle.digest('SHA-256', data);
 
             return await crypto.subtle.importKey(
@@ -162,7 +225,6 @@
 
         async function encryptText(plainText, key, customIv = null) {
             const encoder = new TextEncoder();
-            // Mencegah Nonce Reuse dengan membuat 96-bit random IV acak baru
             const iv = customIv || crypto.getRandomValues(new Uint8Array(12));
             
             const encryptedBuffer = await crypto.subtle.encrypt(
@@ -191,8 +253,7 @@
 
                 return decoder.decode(decryptedBuffer);
             } catch (err) {
-                console.error("Gagal mendekripsi payload:", err);
-                return "[Gagal Dekripsi: Passphrase Salah]";
+                return "[Gagal Dekripsi: Key Salah]";
             }
         }
 
@@ -203,19 +264,15 @@
             const encTitle = await encryptText(title, key, ivTitleBytes);
             const encBody = await encryptText(body, key, ivBodyBytes);
 
-            // Gabungkan IV dengan pemisah '|'
-            const combinedIv = `${encTitle.iv}|${encBody.iv}`;
-
             return {
                 encrypted_title: encTitle.ciphertext,
                 encrypted_body: encBody.ciphertext,
-                iv: combinedIv
+                iv: `${encTitle.iv}|${encBody.iv}`
             };
         }
 
         async function decryptNotePayload(encTitle, encBody, ivString, key) {
             let ivTitle, ivBody;
-
             if (ivString && ivString.includes('|')) {
                 const parts = ivString.split('|');
                 ivTitle = parts[0];
@@ -232,7 +289,7 @@
         }
 
         // ----------------------------------------------------------------------
-        // MANAJEMEN SESI & VAULT STATE
+        // MANAJEMEN SESI & STATE MANAGEMENT
         // ----------------------------------------------------------------------
         async function initApp() {
             const storedPassphrase = sessionStorage.getItem('private_notes_passphrase');
@@ -243,7 +300,6 @@
                     showUnlockedUI();
                     await fetchAndRenderNotes();
                 } catch (err) {
-                    console.error("Inisialisasi vault gagal:", err);
                     handleLock();
                 }
             } else {
@@ -254,14 +310,10 @@
         async function handleUnlock(event) {
             if (event) event.preventDefault();
             const input = document.getElementById('passphrase-input').value.trim();
-            if (!input) {
-                alert("Passphrase wajib diisi!");
-                return;
-            }
+            if (!input) return alert("Passphrase wajib diisi!");
 
             sessionStorage.setItem('private_notes_passphrase', input);
             document.getElementById('passphrase-input').value = '';
-            
             await initApp();
         }
 
@@ -269,9 +321,10 @@
             sessionStorage.removeItem('private_notes_passphrase');
             currentCryptoKey = null;
             cachedNotes = [];
+            filteredNotes = [];
+            selectedNoteIndex = null;
             
-            resetForm();
-            closeViewer();
+            switchMode('LIST');
             showLockedUI();
         }
 
@@ -280,7 +333,7 @@
             if (newKey && newKey.trim() !== '') {
                 sessionStorage.setItem('private_notes_passphrase', newKey.trim());
                 currentCryptoKey = await deriveKeyFromPassphrase(newKey.trim());
-                alert("Passphrase aktif diperbarui untuk sesi ini!");
+                alert("Passphrase aktif diperbarui!");
                 await fetchAndRenderNotes();
             }
         }
@@ -288,80 +341,292 @@
         function showLockedUI() {
             document.getElementById('lock-section').style.display = 'block';
             document.getElementById('app-section').style.display = 'none';
+            document.getElementById('floating-navbar').style.display = 'none';
         }
 
         function showUnlockedUI() {
             document.getElementById('lock-section').style.display = 'none';
             document.getElementById('app-section').style.display = 'block';
+            document.getElementById('floating-navbar').style.display = 'flex';
         }
 
         // ----------------------------------------------------------------------
-        // INTERAKSI API VERCEL (FETCH) & CRUD
+        // MODE SWITCHING & DYNAMIC FLOATING NAVBAR
+        // ----------------------------------------------------------------------
+        function switchMode(newMode) {
+            activeMode = newMode;
+
+            // Element UI Visibility
+            const editorFieldset = document.getElementById('editor-fieldset');
+            const editorBr = document.getElementById('editor-br');
+            const viewerFieldset = document.getElementById('viewer-fieldset');
+            const viewerBr = document.getElementById('viewer-br');
+
+            if (newMode === 'LIST') {
+                editorFieldset.style.display = 'none';
+                editorBr.style.display = 'none';
+                viewerFieldset.style.display = 'none';
+                viewerBr.style.display = 'none';
+                selectedNoteIndex = null;
+            } else if (newMode === 'EDITING') {
+                editorFieldset.style.display = 'block';
+                editorBr.style.display = 'block';
+                viewerFieldset.style.display = 'none';
+                viewerBr.style.display = 'none';
+            } else if (newMode === 'VIEWING') {
+                editorFieldset.style.display = 'none';
+                editorBr.style.display = 'none';
+                viewerFieldset.style.display = 'block';
+                viewerBr.style.display = 'block';
+            }
+
+            renderNotesListTable();
+            renderFloatingNavbar();
+        }
+
+        function renderFloatingNavbar() {
+            const navbar = document.getElementById('floating-navbar');
+            navbar.innerHTML = '';
+
+            if (activeMode === 'LIST') {
+                if (selectedNoteIndex !== null) {
+                    // Mode: Ada Row Tabel yang Dipilih
+                    navbar.innerHTML = `
+                        <span><strong>Mode: Selection Active</strong></span> |
+                        <button type="button" onclick="readSelectedNote()">[Baca Detail]</button>
+                        <button type="button" onclick="editSelectedNote()">[Edit]</button>
+                        <button type="button" onclick="deleteSelectedNote()">[Hapus]</button>
+                        <button type="button" onclick="clearSelection()">[Batal Pilih]</button>
+                    `;
+                } else {
+                    // Mode: Daftar Biasa
+                    navbar.innerHTML = `
+                        <span><strong>Vault Active</strong></span> |
+                        <button type="button" onclick="openNewNoteEditor()">+ Catatan Baru</button>
+                        <button type="button" onclick="fetchAndRenderNotes()">Refresh</button>
+                    `;
+                }
+            } else if (activeMode === 'EDITING') {
+                navbar.innerHTML = `
+                    <span><strong>Mode: Editor</strong></span> |
+                    <button type="button" onclick="handleSaveNote(false)">Apply (Simpan Draft)</button>
+                    <button type="button" onclick="handleSaveNote(true)">Save & Exit</button>
+                    <button type="button" onclick="resetFormToInitial()">Reset</button>
+                    <button type="button" onclick="switchMode('LIST')">Batal</button>
+                `;
+            } else if (activeMode === 'VIEWING') {
+                navbar.innerHTML = `
+                    <span><strong>Mode: Viewer</strong></span> |
+                    <button type="button" onclick="editSelectedNote()">Edit Catatan Ini</button>
+                    <button type="button" onclick="deleteSelectedNote()">Hapus Catatan Ini</button>
+                    <button type="button" onclick="switchMode('LIST')">Tutup Detail</button>
+                `;
+            }
+        }
+
+        // ----------------------------------------------------------------------
+        // FETCH DATA & DEKRIPSI
         // ----------------------------------------------------------------------
         async function fetchAndRenderNotes() {
-            const tbody = document.getElementById('notes-list');
-            tbody.innerHTML = '<tr><td colspan="5">Memuat dan mendekripsi data...</td></tr>';
-
             try {
                 const response = await fetch(`${API_URL}?action=get_notes`);
                 if (!response.ok) throw new Error('Gagal mengambil data dari API Vercel');
 
                 const result = await response.json();
-                const notes = result.data || [];
-                cachedNotes = notes;
+                const rawNotes = result.data || [];
                 
-                tbody.innerHTML = '';
-
-                if (notes.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="5">Belum ada catatan terenkripsi yang tersimpan.</td></tr>';
-                    return;
-                }
-
-                for (let i = 0; i < notes.length; i++) {
-                    const note = notes[i];
-                    
-                    const decryptedData = await decryptNotePayload(
+                // Dekripsi seluruh catatan ke RAM
+                cachedNotes = [];
+                for (let note of rawNotes) {
+                    const decrypted = await decryptNotePayload(
                         note.encrypted_title,
                         note.encrypted_body,
                         note.iv,
                         currentCryptoKey
                     );
-
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td>${note.id}</td>
-                        <td>${escapeHtml(decryptedData.title)}</td>
-                        <td>${escapeHtml(note.tags || '-')}</td>
-                        <td>${escapeHtml(note.updated_at || note.created_at || '-')}</td>
-                        <td>
-                            <button type="button" onclick="readNote(${i})">[Baca]</button>
-                            <button type="button" onclick="editNote(${i})">[Edit]</button>
-                            <button type="button" onclick="deleteNote(${note.id})">[Hapus]</button>
-                        </td>
-                    `;
-                    tbody.appendChild(tr);
+                    
+                    cachedNotes.push({
+                        ...note,
+                        title: decrypted.title,
+                        body: decrypted.body
+                    });
                 }
+
+                applyTitleSearchFilter();
             } catch (err) {
                 console.error(err);
-                tbody.innerHTML = `<tr><td colspan="5" style="color: red;">Error: ${err.message}</td></tr>`;
+                document.getElementById('notes-list').innerHTML = `<tr><td colspan="5" style="color: red;">Error: ${err.message}</td></tr>`;
             }
         }
 
-        async function handleSaveNote(event) {
-            event.preventDefault();
+        // ----------------------------------------------------------------------
+        // TITLE-ONLY SEARCH & PAGINATION
+        // ----------------------------------------------------------------------
+        function handleSearchInput() {
+            currentPage = 1; // Reset ke halaman pertama saat melakukan pencarian
+            applyTitleSearchFilter();
+        }
+
+        function clearSearch() {
+            document.getElementById('search-input').value = '';
+            handleSearchInput();
+        }
+
+        function applyTitleSearchFilter() {
+            const query = document.getElementById('search-input').value.trim().toLowerCase();
             
+            if (!query) {
+                filteredNotes = [...cachedNotes];
+            } else {
+                // Pencarian RINGAN: Hanya mencocokkan string Title yang sudah terdekripsi di RAM
+                filteredNotes = cachedNotes.filter(n => n.title.toLowerCase().includes(query));
+            }
+
+            renderNotesListTable();
+        }
+
+        function handleItemsPerPageChange() {
+            itemsPerPage = parseInt(document.getElementById('items-per-page').value, 10);
+            currentPage = 1;
+            renderNotesListTable();
+        }
+
+        function changePage(direction) {
+            const totalPages = Math.ceil(filteredNotes.length / itemsPerPage) || 1;
+            currentPage += direction;
+            
+            if (currentPage < 1) currentPage = 1;
+            if (currentPage > totalPages) currentPage = totalPages;
+
+            renderNotesListTable();
+        }
+
+        function renderNotesListTable() {
+            const tbody = document.getElementById('notes-list');
+            tbody.innerHTML = '';
+
+            if (filteredNotes.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5">Tidak ada catatan yang ditemukan.</td></tr>';
+                document.getElementById('pagination-info').textContent = 'Halaman 0 dari 0';
+                document.getElementById('btn-prev-page').disabled = true;
+                document.getElementById('btn-next-page').disabled = true;
+                return;
+            }
+
+            // Hitung Slice Array untuk Pagination
+            const totalPages = Math.ceil(filteredNotes.length / itemsPerPage);
+            if (currentPage > totalPages) currentPage = totalPages;
+
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const endIndex = startIndex + itemsPerPage;
+            const paginatedNotes = filteredNotes.slice(startIndex, endIndex);
+
+            // Render Rows Tabel
+            paginatedNotes.forEach((note) => {
+                const globalIndex = cachedNotes.findIndex(c => c.id === note.id);
+                const isSelected = (selectedNoteIndex === globalIndex);
+
+                const tr = document.createElement('tr');
+                if (isSelected) tr.className = 'active-row';
+
+                tr.innerHTML = `
+                    <td><code>${note.id}</code></td>
+                    <td>${escapeHtml(note.title)}</td>
+                    <td>${escapeHtml(note.tags || '-')}</td>
+                    <td>${escapeHtml(note.updated_at || note.created_at || '-')}</td>
+                    <td>
+                        <button type="button" onclick="selectNoteRow(${globalIndex})">${isSelected ? '✓ Selected' : 'Pilih'}</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // Update Pagination Controls
+            document.getElementById('pagination-info').textContent = `Halaman ${currentPage} dari ${totalPages} (Total: ${filteredNotes.length} Catatan)`;
+            document.getElementById('btn-prev-page').disabled = (currentPage === 1);
+            document.getElementById('btn-next-page').disabled = (currentPage === totalPages);
+        }
+
+        function selectNoteRow(globalIndex) {
+            if (selectedNoteIndex === globalIndex) {
+                selectedNoteIndex = null;
+            } else {
+                selectedNoteIndex = globalIndex;
+            }
+            renderNotesListTable();
+            renderFloatingNavbar();
+        }
+
+        function clearSelection() {
+            selectedNoteIndex = null;
+            renderNotesListTable();
+            renderFloatingNavbar();
+        }
+
+        // ----------------------------------------------------------------------
+        // FORM EDITOR & CRUD ACTIONS
+        // ----------------------------------------------------------------------
+        function openNewNoteEditor() {
+            document.getElementById('note-id').value = '';
+            document.getElementById('note-title').value = '';
+            document.getElementById('note-body').value = '';
+            document.getElementById('note-tags').value = '';
+
+            originalFormData = { title: '', body: '', tags: '' };
+            document.getElementById('form-legend').textContent = "Buat Catatan Baru";
+
+            switchMode('EDITING');
+            window.scrollTo({ top: document.getElementById('editor-fieldset').offsetTop, behavior: 'smooth' });
+        }
+
+        function editSelectedNote() {
+            if (selectedNoteIndex === null) return;
+            const note = cachedNotes[selectedNoteIndex];
+
+            document.getElementById('note-id').value = note.id;
+            document.getElementById('note-title').value = note.title;
+            document.getElementById('note-body').value = note.body;
+            document.getElementById('note-tags').value = note.tags || '';
+
+            originalFormData = { title: note.title, body: note.body, tags: note.tags || '' };
+            document.getElementById('form-legend').textContent = `Edit Catatan (UUID: ${note.id})`;
+
+            switchMode('EDITING');
+            window.scrollTo({ top: document.getElementById('editor-fieldset').offsetTop, behavior: 'smooth' });
+        }
+
+        function resetFormToInitial() {
+            document.getElementById('note-title').value = originalFormData.title;
+            document.getElementById('note-body').value = originalFormData.body;
+            document.getElementById('note-tags').value = originalFormData.tags;
+        }
+
+        function readSelectedNote() {
+            if (selectedNoteIndex === null) return;
+            const note = cachedNotes[selectedNoteIndex];
+
+            document.getElementById('view-title').textContent = note.title;
+            document.getElementById('view-body').textContent = note.body;
+            document.getElementById('view-tags').textContent = note.tags || '-';
+            document.getElementById('view-date').textContent = note.updated_at || note.created_at || '-';
+            document.getElementById('view-uuid').textContent = note.id;
+
+            switchMode('VIEWING');
+            window.scrollTo({ top: document.getElementById('viewer-fieldset').offsetTop, behavior: 'smooth' });
+        }
+
+        async function handleSaveNote(exitAfterSave = false) {
             const id = document.getElementById('note-id').value;
             const title = document.getElementById('note-title').value.trim();
             const body = document.getElementById('note-body').value.trim();
             const tags = document.getElementById('note-tags').value.trim();
 
             if (!title || !body) {
-                alert("Judul dan Isi Catatan wajib diisi!");
-                return;
+                return alert("Judul dan Isi Catatan wajib diisi!");
             }
 
             try {
-                // Enkripsi data di browser
+                // Enkripsi payload di browser
                 const encryptedPayload = await encryptNotePayload(title, body, currentCryptoKey);
 
                 const payload = {
@@ -388,68 +653,41 @@
                     throw new Error(result.message || "Gagal menyimpan catatan.");
                 }
 
-                alert("Catatan berhasil disimpan dalam bentuk terenkripsi!");
-                resetForm();
+                // Simpan ID baru jika operasi pendaftaran (Create Note)
+                if (!id && result.data && result.data.id) {
+                    document.getElementById('note-id').value = result.data.id;
+                }
+
+                // Update originalFormData untuk fitur Reset
+                originalFormData = { title, body, tags };
+
+                alert(exitAfterSave ? "Catatan tersimpan! Menutup editor..." : "Draft catatan berhasil disimpan (Apply)!");
+                
                 await fetchAndRenderNotes();
+
+                if (exitAfterSave) {
+                    switchMode('LIST');
+                } else {
+                    // Update tampilan teks legend editor dengan UUID terbaru
+                    const currentId = document.getElementById('note-id').value;
+                    document.getElementById('form-legend').textContent = `Edit Catatan (UUID: ${currentId})`;
+                }
             } catch (err) {
-                alert("Terjadi kesalahan: " + err.message);
+                alert("Error: " + err.message);
             }
         }
 
-        async function readNote(index) {
-            const note = cachedNotes[index];
-            if (!note) return;
+        async function deleteSelectedNote() {
+            if (selectedNoteIndex === null) return;
+            const note = cachedNotes[selectedNoteIndex];
 
-            const decrypted = await decryptNotePayload(
-                note.encrypted_title,
-                note.encrypted_body,
-                note.iv,
-                currentCryptoKey
-            );
-
-            document.getElementById('view-title').textContent = decrypted.title;
-            document.getElementById('view-body').textContent = decrypted.body;
-            document.getElementById('view-tags').textContent = note.tags || '-';
-            document.getElementById('view-date').textContent = note.updated_at || note.created_at || '-';
-            
-            document.getElementById('viewer-fieldset').style.display = 'block';
-            window.scrollTo({ top: document.getElementById('viewer-fieldset').offsetTop, behavior: 'smooth' });
-        }
-
-        function closeViewer() {
-            document.getElementById('viewer-fieldset').style.display = 'none';
-        }
-
-        async function editNote(index) {
-            const note = cachedNotes[index];
-            if (!note) return;
-
-            const decrypted = await decryptNotePayload(
-                note.encrypted_title,
-                note.encrypted_body,
-                note.iv,
-                currentCryptoKey
-            );
-
-            document.getElementById('note-id').value = note.id;
-            document.getElementById('note-title').value = decrypted.title;
-            document.getElementById('note-body').value = decrypted.body;
-            document.getElementById('note-tags').value = note.tags || '';
-
-            document.getElementById('form-legend').textContent = `Edit Catatan (ID: ${note.id})`;
-            document.getElementById('btn-submit').textContent = "Perbarui Catatan";
-            
-            window.scrollTo({ top: document.getElementById('note-form').offsetTop, behavior: 'smooth' });
-        }
-
-        async function deleteNote(id) {
-            if (!confirm(`Apakah Anda yakin ingin menghapus catatan ID ${id}?`)) return;
+            if (!confirm(`Hapus catatan secara permanen? \nUUID: ${note.id}`)) return;
 
             try {
                 const response = await fetch(`${API_URL}?action=delete_note`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id: id })
+                    body: JSON.stringify({ id: note.id })
                 });
 
                 const result = await response.json();
@@ -458,22 +696,14 @@
                 }
 
                 alert("Catatan berhasil dihapus.");
+                switchMode('LIST');
                 await fetchAndRenderNotes();
             } catch (err) {
                 alert("Error: " + err.message);
             }
         }
 
-        function resetForm() {
-            document.getElementById('note-id').value = '';
-            document.getElementById('note-title').value = '';
-            document.getElementById('note-body').value = '';
-            document.getElementById('note-tags').value = '';
-            document.getElementById('form-legend').textContent = "Buat Catatan Baru";
-            document.getElementById('btn-submit').textContent = "Simpan Catatan";
-        }
-
-        // Jalankan aplikasi saat dokumen selesai dimuat
+        // Auto-Init App
         document.addEventListener('DOMContentLoaded', initApp);
     </script>
 </body>
