@@ -1,0 +1,146 @@
+/* public/css/styles.css */
+
+body {
+    margin: 0;
+    font-family: sans-serif;
+    padding-bottom: 30px;
+    background-color: #fafafa;
+    color: #333;
+}
+
+/* 1. TOP STICKY NAVBAR */
+#top-navbar {
+    position: sticky;
+    top: 0;
+    background-color: #222;
+    color: #fff;
+    padding: 10px 15px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+/* Branding Judul "private note" */
+#top-navbar .brand-logo {
+    font-size: 0.95em;
+    font-weight: bold;
+    color: #4da6ff;
+    letter-spacing: 0.5px;
+    text-transform: lowercase;
+    white-space: nowrap;
+}
+
+#top-navbar .btn-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+#top-navbar button {
+    cursor: pointer;
+    padding: 6px 12px;
+    font-weight: bold;
+    font-size: 0.85em;
+    border-radius: 4px;
+    border: 1px solid #444;
+    background-color: #333;
+    color: #fff;
+}
+
+#top-navbar button:hover {
+    background-color: #555;
+}
+
+/* RESPONSIF: Susun 2 Row jika Layar Sempit / Mobile */
+@media (max-width: 600px) {
+    #top-navbar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 8px 12px;
+    }
+    #top-navbar .btn-group {
+        width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+}
+
+/* 2. LAYOUT CONTAINER */
+.container {
+    padding: 15px;
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+fieldset {
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 15px;
+    background-color: #fff;
+}
+
+legend {
+    padding: 0 8px;
+}
+
+.pagination-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 15px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.filter-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.active-row {
+    background-color: #e6f7ff !important;
+}
+
+/* 3. TABLE STYLING */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+}
+
+th, td {
+    border: 1px solid #ddd;
+    padding: 8px 12px;
+}
+
+th {
+    background-color: #eee;
+}
+
+code {
+    font-family: monospace;
+    background-color: #f0f0f0;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+
+pre {
+    white-space: pre-wrap;
+    font-family: inherit;
+    background-color: #f4f4f4;
+    padding: 12px;
+    border-radius: 4px;
+    border: 1px solid #e0e0e0;
+}
