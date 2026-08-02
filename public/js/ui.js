@@ -13,6 +13,15 @@ export function escapeHtml(str) {
         .replace(/'/g, '&#039;');
 }
 
+/**
+ * Penyesuaian tinggi textarea secara otomatis mengikuti isi teks ketikan
+ */
+export function autoExpandTextarea(element) {
+    if (!element) return;
+    element.style.height = 'auto';
+    element.style.height = Math.max(160, element.scrollHeight) + 'px';
+}
+
 export function showLockedUI() {
     document.getElementById('lock-section').style.display = 'block';
     document.getElementById('app-section').style.display = 'none';
@@ -82,6 +91,10 @@ export function switchModeUI(newMode) {
         viewerFieldset.style.display = 'none';
         viewerBr.style.display = 'none';
         window.scrollTo({ top: editorFieldset.offsetTop - 60, behavior: 'smooth' });
+        
+        // Auto-expand tinggi textarea saat mode editor dibuka
+        const bodyTextarea = document.getElementById('note-body');
+        if (bodyTextarea) autoExpandTextarea(bodyTextarea);
     } else if (newMode === 'VIEWING') {
         editorFieldset.style.display = 'none';
         editorBr.style.display = 'none';
@@ -150,14 +163,20 @@ export function getFormData() {
 }
 
 /**
- * Mengisi input form editor dengan data
+ * Mengisi input form editor dengan data & auto-expand tinggi textarea
  */
 export function setFormData({ id = '', title = '', body = '', tags = '' }, legendText = "Buat Catatan Baru") {
     document.getElementById('note-id').value = id;
     document.getElementById('note-title').value = title;
-    document.getElementById('note-body').value = body;
+    
+    const bodyTextarea = document.getElementById('note-body');
+    bodyTextarea.value = body;
+    
     document.getElementById('note-tags').value = tags;
     document.getElementById('form-legend').textContent = legendText;
+
+    // Memicu auto-expand tinggi saat data dimasukkan ke editor
+    autoExpandTextarea(bodyTextarea);
 }
 
 /**

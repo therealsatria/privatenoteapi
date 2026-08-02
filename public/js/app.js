@@ -22,7 +22,8 @@ import {
     setFormData, 
     setViewerData,
     renderLogsTable,
-    renderFooterMetrics
+    renderFooterMetrics,
+    autoExpandTextarea
 } from './ui.js';
 
 // KONFIGURASI FLEKSIBEL: Jumlah baris log aktivitas yang ditampilkan
@@ -70,7 +71,7 @@ async function initApp() {
     }
 }
 
-// Vault Locking & Session Management (Dengan Logging Aktivitas Sesi)
+// Vault Locking & Session Management
 async function handleUnlock(event) {
     if (event) event.preventDefault();
     const input = document.getElementById('passphrase-input').value.trim();
@@ -79,14 +80,11 @@ async function handleUnlock(event) {
     sessionStorage.setItem('private_notes_passphrase', input);
     document.getElementById('passphrase-input').value = '';
     
-    // Catat Event SET_KEY ke Log Backend
     await logVaultEventApi('SET_KEY');
-    
     await initApp();
 }
 
 async function handleLock() {
-    // Catat Event RELEASE_KEY sebelum sesi RAM dibersihkan
     await logVaultEventApi('RELEASE_KEY');
 
     sessionStorage.removeItem('private_notes_passphrase');
@@ -105,9 +103,7 @@ async function handleChangeKey() {
         sessionStorage.setItem('private_notes_passphrase', newKey.trim());
         currentCryptoKey = await deriveKeyFromPassphrase(newKey.trim());
         
-        // Catat Event CHANGE_KEY ke Log Backend
         await logVaultEventApi('CHANGE_KEY');
-        
         alert("Passphrase aktif diperbarui!");
         await fetchAndRenderNotes();
         await fetchAndRenderLogs();
@@ -153,7 +149,7 @@ async function fetchAndRenderNotes() {
     }
 }
 
-// Fetch & Render Logs Aktivitas (Max LOG_LIMIT + Total Count)
+// Fetch & Render Logs Aktivitas
 async function fetchAndRenderLogs() {
     try {
         const logData = await fetchLogsApi(LOG_LIMIT);
@@ -404,6 +400,14 @@ function setupEventListeners() {
     document.getElementById('btn-next-page').addEventListener('click', () => changePage(1));
 
     document.getElementById('btn-clear-logs').addEventListener('click', handleClearLogs);
+
+    // Event Listener Auto-Expand Textarea Realtime saat Pengguna Mengetik
+    const bodyTextarea = document.getElementById('note-body');
+    if (bodyTextarea) {
+        bodyTextarea.addEventListener('input', (e) => {
+            autoExpandTextarea(e.target);
+        });
+    }
 
     window.addEventListener('resize', () => {
         const viewportRes = `${window.innerWidth}x${window.innerHeight} px`;

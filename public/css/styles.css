@@ -172,7 +172,27 @@ pre {
     color: #fff;
 }
 
-/* 5. BOTTOM FIXED FOOTER */
+/* 5. FORM EDITOR RESPONSIVE & AUTO-EXPAND STYLING */
+#editor-fieldset input[type="text"],
+#editor-fieldset textarea {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding: 10px;
+    font-family: inherit;
+    font-size: 0.95em;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+#note-body {
+    min-height: 160px;
+    resize: vertical;
+    overflow-y: hidden; /* Mencegah scrollbar internal saat auto-expand */
+    line-height: 1.5;
+}
+
+/* 6. BOTTOM FIXED FOOTER */
 #bottom-footer {
     position: fixed;
     bottom: 0;
