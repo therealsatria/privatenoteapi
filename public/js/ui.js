@@ -170,3 +170,45 @@ export function setViewerData(note) {
     document.getElementById('view-date').textContent = note.updated_at || note.created_at || '-';
     document.getElementById('view-uuid').textContent = note.id || '';
 }
+
+/**
+ * Merender Baris Tabel Log Aktivitas (Max LOG_LIMIT baris)
+ */
+export function renderLogsTable(logs) {
+    const tbody = document.getElementById('logs-list');
+    tbody.innerHTML = '';
+
+    if (!logs || logs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4">Belum ada log aktivitas tersimpan.</td></tr>';
+        return;
+    }
+
+    logs.forEach(log => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${escapeHtml(log.created_at || '-')}</td>
+            <td><strong>${escapeHtml(log.action_type)}</strong></td>
+            <td><code>${log.note_id ? escapeHtml(log.note_id) : '-'}</code></td>
+            <td>${escapeHtml(log.ip_address || '-')} (${escapeHtml(log.region || 'Local')})</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+/**
+ * Merender Informasi Footer (Resolusi, Jam Realtime, IP, & Latency Ping)
+ */
+export function renderFooterMetrics({ viewportRes, screenRes, datetimeStr, epochMs, ip, region, pingMs, statusClass }) {
+    const elRes = document.getElementById('footer-resolution');
+    const elTime = document.getElementById('footer-datetime');
+    const elGeo = document.getElementById('footer-geo');
+    const elPing = document.getElementById('footer-ping');
+
+    if (elRes) elRes.textContent = `${viewportRes} (Screen: ${screenRes})`;
+    if (elTime) elTime.textContent = `${datetimeStr} (${epochMs} ms)`;
+    if (elGeo && ip) elGeo.textContent = `IP: ${ip} (${region || 'Unknown'})`;
+    
+    if (elPing) {
+        elPing.innerHTML = `<span class="status-dot ${statusClass}"></span> API ${pingMs !== null ? pingMs + ' ms' : 'Offline'}`;
+    }
+}

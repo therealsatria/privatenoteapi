@@ -1,7 +1,16 @@
 /* public/js/app.js */
 
 import { deriveKeyFromPassphrase, encryptNotePayload, decryptNotePayload } from './crypto.js';
-import { fetchNotesApi, createNoteApi, updateNoteApi, deleteNoteApi } from './api.js';
+import { 
+    fetchNotesApi, 
+    createNoteApi, 
+    updateNoteApi, 
+    deleteNoteApi, 
+    pingApi, 
+    fetchLogsApi, 
+    clearLogsApi 
+} from './api.js';
+
 import { 
     showLockedUI, 
     showUnlockedUI, 
@@ -10,8 +19,13 @@ import {
     renderNotesTable, 
     getFormData, 
     setFormData, 
-    setViewerData 
+    setViewerData,
+    renderLogsTable,
+    renderFooterMetrics
 } from './ui.js';
+
+// KONFIGURASI FLEKSIBEL: Jumlah baris log aktivitas yang ditampilkan
+const LOG_LIMIT = 3; 
 
 // Application State (RAM Only)
 let currentCryptoKey = null;
@@ -25,16 +39,27 @@ let originalFormData = { title: '', body: '', tags: '' };
 let currentPage = 1;
 let itemsPerPage = 10;
 
+// Geo & Ping State
+let userIp = null;
+let userRegion = null;
+let pingTimer = null;
+let clockTimer = null;
+let lastPingMs = null;
+let lastPingStatusClass = 'orange';
+
 // Initialize Application
 async function initApp() {
     setupEventListeners();
-    
+    startRealtimeClock();
+    startPeriodicPing();
+
     const storedPassphrase = sessionStorage.getItem('private_notes_passphrase');
     if (storedPassphrase) {
         try {
             currentCryptoKey = await deriveKeyFromPassphrase(storedPassphrase);
             showUnlockedUI();
             await fetchAndRenderNotes();
+            await fetchAndRenderLogs();
         } catch (err) {
             console.error("Init Error:", err);
             handleLock();
@@ -87,7 +112,7 @@ function switchMode(newMode) {
     renderTopNavbar(activeMode, selectedNoteIndex);
 }
 
-// Fetch & Decrypt Data
+// Fetch & Decrypt Notes
 async function fetchAndRenderNotes() {
     try {
         const rawNotes = await fetchNotesApi();
@@ -112,6 +137,27 @@ async function fetchAndRenderNotes() {
     } catch (err) {
         console.error(err);
         document.getElementById('notes-list').innerHTML = `<tr><td colspan="5" style="color: red;">Error: ${err.message}</td></tr>`;
+    }
+}
+
+// Fetch & Render Logs Aktivitas (Max LOG_LIMIT)
+async function fetchAndRenderLogs() {
+    try {
+        const logs = await fetchLogsApi(LOG_LIMIT);
+        renderLogsTable(logs);
+    } catch (err) {
+        console.error("Gagal memuat log:", err);
+    }
+}
+
+async function handleClearLogs() {
+    if (!confirm("Apakah Anda yakin ingin menghapus SELURUH log aktivitas?")) return;
+    try {
+        await clearLogsApi();
+        alert("Seluruh log aktivitas berhasil dibersihkan!");
+        await fetchAndRenderLogs();
+    } catch (err) {
+        alert("Error: " + err.message);
     }
 }
 
@@ -231,6 +277,7 @@ async function handleSaveNote(exitAfterSave = false) {
         alert(exitAfterSave ? "Catatan tersimpan! Menutup editor..." : "Draft catatan berhasil disimpan (Apply)!");
 
         await fetchAndRenderNotes();
+        await fetchAndRenderLogs(); // Refresh log otomatis setelah simpan
 
         if (exitAfterSave) {
             switchMode('LIST');
@@ -254,12 +301,80 @@ async function deleteSelectedNote() {
         alert("Catatan berhasil dihapus.");
         switchMode('LIST');
         await fetchAndRenderNotes();
+        await fetchAndRenderLogs(); // Refresh log otomatis setelah hapus
     } catch (err) {
         alert("Error: " + err.message);
     }
 }
 
-// Global Event Delegation setup untuk Elemen Dinamis
+// ----------------------------------------------------------------------
+// REALTIME CLOCK, RESOLUTION MONITOR, & PERIODIC PING (FOOTER METRICS)
+// ----------------------------------------------------------------------
+function startRealtimeClock() {
+    if (clockTimer) clearInterval(clockTimer);
+    
+    const updateMetrics = () => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+
+        const datetimeStr = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+        const epochMs = now.getTime();
+
+        const viewportRes = `${window.innerWidth}x${window.innerHeight} px`;
+        const screenRes = `${window.screen.width}x${window.screen.height} px`;
+
+        renderFooterMetrics({
+            viewportRes,
+            screenRes,
+            datetimeStr,
+            epochMs,
+            ip: userIp,
+            region: userRegion,
+            pingMs: lastPingMs,
+            statusClass: lastPingStatusClass
+        });
+    };
+
+    updateMetrics();
+    clockTimer = setInterval(updateMetrics, 200); // Update halus realtime
+}
+
+async function executePing() {
+    // Jalankan PING hanya jika tab browser sedang aktif dibuka
+    if (document.visibilityState && document.visibilityState !== 'visible') return;
+
+    const startTime = performance.now();
+    try {
+        const data = await pingApi();
+        const endTime = performance.now();
+        const rtt = Math.round(endTime - startTime);
+
+        userIp = data.ip;
+        userRegion = data.region;
+        lastPingMs = rtt;
+
+        if (rtt < 300) lastPingStatusClass = 'green';
+        else if (rtt < 1000) lastPingStatusClass = 'orange';
+        else lastPingStatusClass = 'red';
+
+    } catch (err) {
+        lastPingMs = null;
+        lastPingStatusClass = 'red';
+    }
+}
+
+function startPeriodicPing() {
+    executePing(); // Ping awal saat pertama load
+    if (pingTimer) clearInterval(pingTimer);
+    pingTimer = setInterval(executePing, 15000); // Periodic ping setiap 15 detik (Hemat kuota Vercel)
+}
+
+// Global Event Listeners Setup
 function setupEventListeners() {
     document.getElementById('unlock-form').addEventListener('submit', handleUnlock);
     document.getElementById('btn-change-key').addEventListener('click', handleChangeKey);
@@ -271,7 +386,18 @@ function setupEventListeners() {
     document.getElementById('btn-prev-page').addEventListener('click', () => changePage(-1));
     document.getElementById('btn-next-page').addEventListener('click', () => changePage(1));
 
-    // Event Delegation untuk Tombol Pilih di Baris Tabel
+    // Clear Logs Button Listener
+    document.getElementById('btn-clear-logs').addEventListener('click', handleClearLogs);
+
+    // Event Listener Resize untuk Update Resolusi Viewport
+    window.addEventListener('resize', () => {
+        const viewportRes = `${window.innerWidth}x${window.innerHeight} px`;
+        const screenRes = `${window.screen.width}x${window.screen.height} px`;
+        const elRes = document.getElementById('footer-resolution');
+        if (elRes) elRes.textContent = `${viewportRes} (Screen: ${screenRes})`;
+    });
+
+    // Event Delegation untuk Tombol Pilih di Baris Tabel Catatan
     document.getElementById('notes-list').addEventListener('click', (e) => {
         const btn = e.target.closest('.btn-select-row');
         if (btn) {
@@ -284,7 +410,7 @@ function setupEventListeners() {
     document.getElementById('navbar-buttons').addEventListener('click', (e) => {
         const id = e.target.id;
         if (id === 'btn-nav-new') openNewNoteEditor();
-        else if (id === 'btn-nav-refresh') fetchAndRenderNotes();
+        else if (id === 'btn-nav-refresh') { fetchAndRenderNotes(); fetchAndRenderLogs(); }
         else if (id === 'btn-nav-read') readSelectedNote();
         else if (id === 'btn-nav-edit') editSelectedNote();
         else if (id === 'btn-nav-delete') deleteSelectedNote();

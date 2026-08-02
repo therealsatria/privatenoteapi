@@ -3,7 +3,7 @@
 body {
     margin: 0;
     font-family: sans-serif;
-    padding-bottom: 30px;
+    padding-bottom: 60px; /* Jarak bawah agar konten tidak tertutup Bottom Footer */
     background-color: #fafafa;
     color: #333;
 }
@@ -16,7 +16,7 @@ body {
     color: #fff;
     padding: 10px 15px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.25);
-    z-index: 9999;
+    z-index: 9990;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -56,7 +56,7 @@ body {
     background-color: #555;
 }
 
-/* RESPONSIF: Susun 2 Row jika Layar Sempit / Mobile */
+/* RESPONSIF TOP NAVBAR: Susun 2 Row jika Layar Sempit / Mobile */
 @media (max-width: 600px) {
     #top-navbar {
         flex-direction: column;
@@ -72,7 +72,7 @@ body {
     }
 }
 
-/* 2. LAYOUT CONTAINER */
+/* 2. LAYOUT CONTAINER & FIELDSETS */
 .container {
     padding: 15px;
     max-width: 1000px;
@@ -143,4 +143,78 @@ pre {
     padding: 12px;
     border-radius: 4px;
     border: 1px solid #e0e0e0;
+}
+
+/* 4. LOGS TABLE SECTION */
+.logs-action-bar {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 10px;
+}
+
+.btn-danger-outline {
+    background-color: #fff;
+    color: #d9534f;
+    border: 1px solid #d9534f;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 0.85em;
+}
+
+.btn-danger-outline:hover {
+    background-color: #d9534f;
+    color: #fff;
+}
+
+/* 5. BOTTOM FIXED FOOTER */
+#bottom-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: #1a1a1a;
+    color: #bbb;
+    padding: 8px 15px;
+    font-size: 0.8em;
+    font-family: monospace;
+    box-shadow: 0 -2px 6px rgba(0,0,0,0.2);
+    z-index: 9999;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+#bottom-footer .footer-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+/* Indicator Status Light Dot */
+.status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 4px;
+}
+
+.status-dot.green {
+    background-color: #00ff66;
+    box-shadow: 0 0 6px #00ff66;
+}
+
+.status-dot.orange {
+    background-color: #ffaa00;
+    box-shadow: 0 0 6px #ffaa00;
+}
+
+.status-dot.red {
+    background-color: #ff3333;
+    box-shadow: 0 0 6px #ff3333;
 }

@@ -3,6 +3,17 @@
 const API_URL = '/api';
 
 /**
+ * PING Endpoint: Memeriksa latensi API, mendapatkan IP Address & Region
+ */
+export async function pingApi() {
+    const response = await fetch(`${API_URL}?action=ping`);
+    if (!response.ok) throw new Error('API Unreachable');
+    const result = await response.json();
+    if (result.status === 'error') throw new Error(result.message);
+    return result.data;
+}
+
+/**
  * Mengambil seluruh daftar catatan terenkripsi dari server
  */
 export async function fetchNotesApi() {
@@ -57,6 +68,32 @@ export async function deleteNoteApi(id) {
     const result = await response.json();
     if (!response.ok || result.status === 'error') {
         throw new Error(result.message || "Gagal menghapus catatan.");
+    }
+    return result.data;
+}
+
+/**
+ * Mengambil N log aktivitas terbaru
+ */
+export async function fetchLogsApi(limit = 3) {
+    const response = await fetch(`${API_URL}?action=get_logs&limit=${limit}`);
+    if (!response.ok) throw new Error('Gagal mengambil data log');
+    const result = await response.json();
+    if (result.status === 'error') throw new Error(result.message);
+    return result.data || [];
+}
+
+/**
+ * Menghapus seluruh log aktivitas secara manual
+ */
+export async function clearLogsApi() {
+    const response = await fetch(`${API_URL}?action=clear_logs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    });
+    const result = await response.json();
+    if (!response.ok || result.status === 'error') {
+        throw new Error(result.message || "Gagal membersihkan log.");
     }
     return result.data;
 }

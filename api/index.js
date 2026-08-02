@@ -1,14 +1,14 @@
 import { neon } from '@neondatabase/serverless';
 
-// Flag memori untuk mencegah re-running DDL query pada warm serverless instance
 let isTableInitialized = false;
 
 /**
- * Membuat tabel dengan tipe data UUID jika belum ada di database Neon
+ * Membuat tabel 'notes' dan 'logs' secara otomatis jika belum ada
  */
 async function ensureTableExists(sql) {
   if (isTableInitialized) return;
 
+  // Tabel Catatan Terenkripsi
   await sql`
     CREATE TABLE IF NOT EXISTS notes (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -21,11 +21,62 @@ async function ensureTableExists(sql) {
     );
   `;
 
+  // Tabel Log Aktivitas
+  await sql`
+    CREATE TABLE IF NOT EXISTS logs (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      note_id UUID NULL,
+      action_type TEXT NOT NULL,
+      ip_address TEXT,
+      region TEXT,
+      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+  `;
+
   isTableInitialized = true;
 }
 
+/**
+ * Membaca IP Address & Region dari Header Vercel Edge Server
+ */
+function getClientGeoInfo(req) {
+  const ip = req.headers['x-real-ip'] || 
+             (req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : '127.0.0.1');
+  
+  const city = req.headers['x-vercel-ip-city'] ? decodeURIComponent(req.headers['x-vercel-ip-city']) : '';
+  const country = req.headers['x-vercel-ip-country'] || '';
+  const regionCode = req.headers['x-vercel-ip-country-region'] || '';
+
+  const regionParts = [city, regionCode, country].filter(Boolean);
+  const region = regionParts.length > 0 ? regionParts.join(', ') : 'Local / Unknown';
+
+  return { ip, region, city, country };
+}
+
+/**
+ * Mencatat Aktivitas ke Tabel Logs & Menjalankan Lazy Cleanup (>3 Bulan)
+ */
+async function logActivity(sql, req, actionType, noteId = null) {
+  try {
+    const { ip, region } = getClientGeoInfo(req);
+
+    // 1. Simpan Log Baru
+    await sql`
+      INSERT INTO logs (note_id, action_type, ip_address, region)
+      VALUES (${noteId ? noteId : null}, ${actionType}, ${ip}, ${region})
+    `;
+
+    // 2. LAZY CLEANUP: Otomatis hapus log yang berusia lebih dari 3 bulan (90 hari)
+    await sql`
+      DELETE FROM logs WHERE created_at < NOW() - INTERVAL '3 months'
+    `;
+  } catch (err) {
+    console.error("Gagal mencatat log aktivitas:", err);
+  }
+}
+
 export default async function handler(req, res) {
-  // Pengaturan Header CORS
+  // Header CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
@@ -37,25 +88,41 @@ export default async function handler(req, res) {
   const sql = neon(process.env.DATABASE_URL);
 
   try {
-    // Inisialisasi tabel otomatis (bila belum ada)
     await ensureTableExists(sql);
 
-    const { action, id: queryId } = req.query || {};
+    const { action, id: queryId, limit: queryLimit } = req.query || {};
     const body = req.body || {};
     const targetId = queryId || body.id;
 
-    // Jika diakses langsung tanpa parameter action
     if (!action) {
       return res.status(200).json({
         status: 'success',
         message: 'Private Notes Zero-Knowledge API is running!',
-        available_actions: ['get_notes', 'get_note_by_id', 'create_note', 'update_note', 'delete_note']
+        available_actions: ['ping', 'get_notes', 'get_note_by_id', 'create_note', 'update_note', 'delete_note', 'get_logs', 'clear_logs']
       });
     }
 
     switch (action) {
 
-      // GET /api?action=get_notes
+      // ----------------------------------------------------------------------
+      // ACTION: PING (Untuk Footer Status Check, IP, Region, & Latency)
+      // ----------------------------------------------------------------------
+      case 'ping': {
+        const geoInfo = getClientGeoInfo(req);
+        return res.status(200).json({
+          status: 'success',
+          message: 'pong',
+          data: {
+            ip: geoInfo.ip,
+            region: geoInfo.region,
+            server_time: Date.now()
+          }
+        });
+      }
+
+      // ----------------------------------------------------------------------
+      // ACTION: GET NOTES
+      // ----------------------------------------------------------------------
       case 'get_notes': {
         if (req.method !== 'GET') return res.status(405).json({ status: 'error', message: 'Method Not Allowed' });
 
@@ -67,28 +134,15 @@ export default async function handler(req, res) {
         return res.status(200).json({ status: 'success', message: 'Notes retrieved', data: notes });
       }
 
-      // GET /api?action=get_note_by_id&id=UUID
-      case 'get_note_by_id': {
-        if (req.method !== 'GET') return res.status(405).json({ status: 'error', message: 'Method Not Allowed' });
-        if (!targetId) return res.status(400).json({ status: 'error', message: 'Missing parameter: id' });
-
-        const [note] = await sql`
-          SELECT id, encrypted_title, encrypted_body, iv, tags, created_at, updated_at 
-          FROM notes 
-          WHERE id = ${targetId}::uuid
-        `;
-
-        if (!note) return res.status(404).json({ status: 'error', message: 'Note not found' });
-        return res.status(200).json({ status: 'success', message: 'Note retrieved', data: note });
-      }
-
-      // POST /api?action=create_note
+      // ----------------------------------------------------------------------
+      // ACTION: CREATE NOTE (Dengan Logging Otomatis)
+      // ----------------------------------------------------------------------
       case 'create_note': {
         if (req.method !== 'POST') return res.status(405).json({ status: 'error', message: 'Method Not Allowed' });
 
         const { encrypted_title, encrypted_body, iv, tags } = body;
         if (!encrypted_title || !encrypted_body || !iv) {
-          return res.status(400).json({ status: 'error', message: 'Payload incomplete. encrypted_title, encrypted_body, and iv are required.' });
+          return res.status(400).json({ status: 'error', message: 'Payload incomplete' });
         }
 
         const [created] = await sql`
@@ -97,10 +151,15 @@ export default async function handler(req, res) {
           RETURNING id, created_at, updated_at
         `;
 
+        // Log Aktivitas
+        await logActivity(sql, req, 'CREATE_NOTE', created.id);
+
         return res.status(201).json({ status: 'success', message: 'Note created', data: created });
       }
 
-      // PUT /api?action=update_note atau POST /api?action=update_note
+      // ----------------------------------------------------------------------
+      // ACTION: UPDATE NOTE (Dengan Logging Otomatis)
+      // ----------------------------------------------------------------------
       case 'update_note': {
         if (req.method !== 'PUT' && req.method !== 'POST') return res.status(405).json({ status: 'error', message: 'Method Not Allowed' });
         if (!targetId) return res.status(400).json({ status: 'error', message: 'Missing parameter: id' });
@@ -122,10 +181,16 @@ export default async function handler(req, res) {
         `;
 
         if (updated.length === 0) return res.status(404).json({ status: 'error', message: 'Note not found' });
+
+        // Log Aktivitas
+        await logActivity(sql, req, 'UPDATE_NOTE', targetId);
+
         return res.status(200).json({ status: 'success', message: 'Note updated', data: updated[0] });
       }
 
-      // DELETE /api?action=delete_note atau POST /api?action=delete_note
+      // ----------------------------------------------------------------------
+      // ACTION: DELETE NOTE (Dengan Logging Otomatis)
+      // ----------------------------------------------------------------------
       case 'delete_note': {
         if (req.method !== 'DELETE' && req.method !== 'POST') return res.status(405).json({ status: 'error', message: 'Method Not Allowed' });
         if (!targetId) return res.status(400).json({ status: 'error', message: 'Missing parameter: id' });
@@ -133,7 +198,42 @@ export default async function handler(req, res) {
         const deleted = await sql`DELETE FROM notes WHERE id = ${targetId}::uuid RETURNING id`;
         if (deleted.length === 0) return res.status(404).json({ status: 'error', message: 'Note not found' });
 
+        // Log Aktivitas
+        await logActivity(sql, req, 'DELETE_NOTE', targetId);
+
         return res.status(200).json({ status: 'success', message: 'Note deleted', data: { id: targetId } });
+      }
+
+      // ----------------------------------------------------------------------
+      // ACTION: GET LOGS (Menampilkan N log terbaru)
+      // ----------------------------------------------------------------------
+      case 'get_logs': {
+        if (req.method !== 'GET') return res.status(405).json({ status: 'error', message: 'Method Not Allowed' });
+
+        const limitVal = parseInt(queryLimit || '3', 10);
+
+        const logs = await sql`
+          SELECT id, note_id, action_type, ip_address, region, created_at
+          FROM logs
+          ORDER BY created_at DESC
+          LIMIT ${limitVal}
+        `;
+
+        return res.status(200).json({ status: 'success', message: 'Logs retrieved', data: logs });
+      }
+
+      // ----------------------------------------------------------------------
+      // ACTION: CLEAR LOGS (Menghapus seluruh log secara manual)
+      // ----------------------------------------------------------------------
+      case 'clear_logs': {
+        if (req.method !== 'POST' && req.method !== 'DELETE') return res.status(405).json({ status: 'error', message: 'Method Not Allowed' });
+
+        await sql`DELETE FROM logs`;
+
+        // Catat Log Aktivitas bahwa Log telah dibersihkan
+        await logActivity(sql, req, 'CLEAR_LOGS', null);
+
+        return res.status(200).json({ status: 'success', message: 'All logs cleared successfully' });
       }
 
       default:

@@ -104,7 +104,7 @@
                     </div>
                 </div>
 
-                <!-- Tabel Data -->
+                <!-- Tabel Data Catatan -->
                 <div style="overflow-x: auto;">
                     <table>
                         <thead>
@@ -129,8 +129,50 @@
                     <button type="button" id="btn-next-page">Selanjutnya →</button>
                 </div>
             </fieldset>
+
+            <br>
+
+            <!-- TABEL LOG AKTIVITAS -->
+            <fieldset id="logs-fieldset">
+                <legend><strong>Log Aktivitas Terakhir</strong></legend>
+                <div style="overflow-x: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 180px;">Waktu</th>
+                                <th style="width: 130px;">Aktivitas</th>
+                                <th style="width: 280px;">Note UUID</th>
+                                <th>IP & Region</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logs-list">
+                            <!-- Data log dirender dinamis -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="logs-action-bar">
+                    <button type="button" id="btn-clear-logs" class="btn-danger-outline">Clear All Logs</button>
+                </div>
+            </fieldset>
+
         </div>
 
+    </div>
+
+    <!-- 4. BOTTOM FIXED FOOTER -->
+    <div id="bottom-footer">
+        <div class="footer-section">
+            <span id="footer-resolution">0x0 px</span>
+        </div>
+        <div class="footer-section">
+            <span id="footer-datetime">----</span>
+        </div>
+        <div class="footer-section">
+            <span id="footer-geo">IP: Fetching...</span>
+        </div>
+        <div class="footer-section">
+            <span id="footer-ping"><span class="status-dot orange"></span> API Connecting...</span>
+        </div>
     </div>
 
     <!-- Import JavaScript ES Module Utama -->
