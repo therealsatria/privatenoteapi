@@ -140,11 +140,16 @@ async function fetchAndRenderNotes() {
     }
 }
 
-// Fetch & Render Logs Aktivitas (Max LOG_LIMIT)
+// Fetch & Render Logs Aktivitas (Max LOG_LIMIT + Total Count)
 async function fetchAndRenderLogs() {
     try {
-        const logs = await fetchLogsApi(LOG_LIMIT);
-        renderLogsTable(logs);
+        const logData = await fetchLogsApi(LOG_LIMIT);
+        
+        if (logData && typeof logData === 'object' && 'logs' in logData) {
+            renderLogsTable(logData.logs, logData.total);
+        } else {
+            renderLogsTable(logData || [], (logData || []).length);
+        }
     } catch (err) {
         console.error("Gagal memuat log:", err);
     }

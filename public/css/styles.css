@@ -148,8 +148,12 @@ pre {
 /* 4. LOGS TABLE SECTION */
 .logs-action-bar {
     display: flex;
-    justify-content: flex-end;
-    margin-top: 10px;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 12px;
+    font-size: 0.9em;
+    font-weight: bold;
+    color: #555;
 }
 
 .btn-danger-outline {

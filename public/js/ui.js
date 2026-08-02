@@ -172,11 +172,16 @@ export function setViewerData(note) {
 }
 
 /**
- * Merender Baris Tabel Log Aktivitas (Max LOG_LIMIT baris)
+ * Merender Baris Tabel Log Aktivitas (Max LOG_LIMIT baris) & Informasi Total
  */
-export function renderLogsTable(logs) {
+export function renderLogsTable(logs, totalCount = 0) {
     const tbody = document.getElementById('logs-list');
+    const elTotal = document.getElementById('logs-total-info');
     tbody.innerHTML = '';
+
+    if (elTotal) {
+        elTotal.textContent = `Total Log: ${totalCount} Data`;
+    }
 
     if (!logs || logs.length === 0) {
         tbody.innerHTML = '<tr><td colspan="4">Belum ada log aktivitas tersimpan.</td></tr>';

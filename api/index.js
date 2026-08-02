@@ -205,13 +205,14 @@ export default async function handler(req, res) {
       }
 
       // ----------------------------------------------------------------------
-      // ACTION: GET LOGS (Menampilkan N log terbaru)
+      // ACTION: GET LOGS (Menampilkan N log terbaru + Total Count)
       // ----------------------------------------------------------------------
       case 'get_logs': {
         if (req.method !== 'GET') return res.status(405).json({ status: 'error', message: 'Method Not Allowed' });
 
         const limitVal = parseInt(queryLimit || '3', 10);
 
+        // 1. Ambil N log terbaru
         const logs = await sql`
           SELECT id, note_id, action_type, ip_address, region, created_at
           FROM logs
@@ -219,7 +220,17 @@ export default async function handler(req, res) {
           LIMIT ${limitVal}
         `;
 
-        return res.status(200).json({ status: 'success', message: 'Logs retrieved', data: logs });
+        // 2. Hitung jumlah total seluruh baris log
+        const [{ count }] = await sql`SELECT COUNT(*) AS count FROM logs`;
+
+        return res.status(200).json({ 
+          status: 'success', 
+          message: 'Logs retrieved', 
+          data: {
+            logs: logs,
+            total: parseInt(count || '0', 10)
+          } 
+        });
       }
 
       // ----------------------------------------------------------------------
