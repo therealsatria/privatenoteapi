@@ -235,7 +235,47 @@ pre {
     border: 1px dashed #ddd;
 }
 
-/* 7. BOTTOM FIXED FOOTER */
+/* 7. TERMINAL CONSOLE LOG MONITOR STYLING (DARK THEME) */
+.terminal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.terminal-container {
+    background-color: #121212;
+    color: #00ff66;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 0.82em;
+    padding: 10px;
+    border-radius: 4px;
+    height: 150px;
+    max-height: 180px;
+    overflow-y: auto;
+    border: 1px solid #333;
+    box-shadow: inset 0 0 8px rgba(0,0,0,0.8);
+    line-height: 1.45;
+}
+
+.terminal-line {
+    margin: 2px 0;
+    word-break: break-all;
+}
+
+.terminal-line.info {
+    color: #00ff66; /* Hijau */
+}
+
+.terminal-line.warn {
+    color: #ffcc00; /* Kuning */
+}
+
+.terminal-line.error {
+    color: #ff4d4d; /* Merah */
+}
+
+/* 8. BOTTOM FIXED FOOTER */
 #bottom-footer {
     position: fixed;
     bottom: 0;

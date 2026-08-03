@@ -27,7 +27,9 @@ import {
     setSaveButtonsLoading,
     renderListTagFilters,
     toggleTagInInput,
-    updateEditorTagButtonStates
+    updateEditorTagButtonStates,
+    setupConsoleInterceptor,
+    clearTerminalScreen
 } from './ui.js';
 
 // KONFIGURASI FLEKSIBEL: Jumlah baris log aktivitas yang ditampilkan
@@ -43,7 +45,7 @@ let selectedNoteIndex = null;
 let originalFormData = { title: '', body: '', tags: '' };
 
 // Tag Filter State
-let selectedFilterTag = ''; // Tag yang sedang dipilih untuk penyaringan di tabel
+let selectedFilterTag = ''; 
 
 let currentPage = 1;
 let itemsPerPage = 10;
@@ -62,6 +64,9 @@ let isEventListenersBound = false;
 
 // Initialize Application
 async function initApp() {
+    setupConsoleInterceptor(); // Aktifkan Interceptor Console Log ke Terminal Screen
+    console.log("[App] Inisialisasi aplikasi 'private note'...");
+    
     setupEventListeners();
     startRealtimeClock();
     startPeriodicPing();
@@ -69,15 +74,20 @@ async function initApp() {
     const storedPassphrase = sessionStorage.getItem('private_notes_passphrase');
     if (storedPassphrase) {
         try {
+            console.log("[Vault] Membuka Vault dari Sesi Aktif...");
+            const startKeyTime = performance.now();
             currentCryptoKey = await deriveKeyFromPassphrase(storedPassphrase);
+            console.log(`[Crypto] Derivasi Key SHA-256 selesai (${Math.round(performance.now() - startKeyTime)} ms)`);
+            
             showUnlockedUI();
             await fetchAndRenderNotes();
             await fetchAndRenderLogs();
         } catch (err) {
-            console.error("Init Error:", err);
+            console.error("[Vault] Gagal membuka vault dari sesi:", err);
             handleLock();
         }
     } else {
+        console.log("[Vault] Status Vault: TERKUNCI (Menunggu Passphrase)");
         showLockedUI();
     }
 }
@@ -85,17 +95,23 @@ async function initApp() {
 // Vault Locking & Session Management
 async function handleUnlock(event) {
     if (event) event.preventDefault();
+    console.log("[UI Click] Tombol 'Set Key / Unlock' diklik");
+    
     const input = document.getElementById('passphrase-input').value.trim();
     if (!input) return alert("Passphrase wajib diisi!");
 
     sessionStorage.setItem('private_notes_passphrase', input);
     document.getElementById('passphrase-input').value = '';
     
+    console.log("[Vault] Mengirim log event 'SET_KEY'...");
     await logVaultEventApi('SET_KEY');
     await initApp();
 }
 
 async function handleLock() {
+    console.log("[UI Click] Tombol 'Lock / Release Key' diklik");
+    console.log("[Vault] Memulai proses penguncian Vault & pembersihan RAM...");
+    
     await logVaultEventApi('RELEASE_KEY');
 
     sessionStorage.removeItem('private_notes_passphrase');
@@ -107,13 +123,19 @@ async function handleLock() {
     
     switchMode('LIST');
     showLockedUI();
+    console.log("[Vault] Vault berhasil dikunci. RAM & Session cleared.");
 }
 
 async function handleChangeKey() {
+    console.log("[UI Click] Tombol 'Change Key' diklik");
     const newKey = prompt("Masukkan Secret Key / Passphrase baru:");
     if (newKey && newKey.trim() !== '') {
+        console.log("[Vault] Memperbarui Passphrase Sesi...");
         sessionStorage.setItem('private_notes_passphrase', newKey.trim());
+        
+        const startKeyTime = performance.now();
         currentCryptoKey = await deriveKeyFromPassphrase(newKey.trim());
+        console.log(`[Crypto] Derivasi Key Baru SHA-256 selesai (${Math.round(performance.now() - startKeyTime)} ms)`);
         
         await logVaultEventApi('CHANGE_KEY');
         alert("Passphrase aktif diperbarui!");
@@ -136,7 +158,13 @@ function switchMode(newMode) {
 // Fetch & Decrypt Notes
 async function fetchAndRenderNotes() {
     try {
+        console.log("[API] Mengambil daftar catatan terenkripsi dari server...");
+        const startFetchTime = performance.now();
         const rawNotes = await fetchNotesApi();
+        console.log(`[API] Berhasil menerima ${rawNotes.length} catatan (${Math.round(performance.now() - startFetchTime)} ms)`);
+
+        console.log("[Crypto] Memulai dekripsi AES-256-GCM seluruh catatan di RAM...");
+        const startDecryptTime = performance.now();
         cachedNotes = [];
 
         for (let note of rawNotes) {
@@ -154,9 +182,10 @@ async function fetchAndRenderNotes() {
             });
         }
 
+        console.log(`[Crypto] Dekripsi ${cachedNotes.length} catatan selesai (${Math.round(performance.now() - startDecryptTime)} ms)`);
         applyTitleSearchFilter();
     } catch (err) {
-        console.error(err);
+        console.error("[API/Crypto] Error saat memuat/mendekripsi catatan:", err);
         document.getElementById('notes-list').innerHTML = `<tr><td colspan="5" style="color: red;">Error: ${err.message}</td></tr>`;
     }
 }
@@ -164,38 +193,41 @@ async function fetchAndRenderNotes() {
 // Fetch & Render Logs Aktivitas
 async function fetchAndRenderLogs() {
     try {
+        console.log(`[API] Memuat log aktivitas terbaru (Limit: ${LOG_LIMIT})...`);
         const logData = await fetchLogsApi(LOG_LIMIT);
         
         if (logData && typeof logData === 'object' && 'logs' in logData) {
+            console.log(`[Logs] Berhasil memuat ${logData.logs.length} baris log (Total DB: ${logData.total})`);
             renderLogsTable(logData.logs, logData.total);
         } else {
             renderLogsTable(logData || [], (logData || []).length);
         }
     } catch (err) {
-        console.error("Gagal memuat log:", err);
+        console.error("[API] Gagal memuat log aktivitas:", err);
     }
 }
 
 async function handleClearLogs() {
+    console.log("[UI Click] Tombol 'Clear All Logs' diklik");
     if (!confirm("Apakah Anda yakin ingin menghapus SELURUH log aktivitas?")) return;
     try {
+        console.log("[API] Mengirim request pembersihan log...");
         await clearLogsApi();
         alert("Seluruh log aktivitas berhasil dibersihkan!");
         await fetchAndRenderLogs();
     } catch (err) {
+        console.error("[API] Gagal membersihkan log:", err);
         alert("Error: " + err.message);
     }
 }
 
-// Filter Ganda (Kata Kunci Judul DAN Filter Tag)
+// Filter Judul DAN Filter Tag Aktif
 function applyTitleSearchFilter() {
     const query = document.getElementById('search-input').value.trim().toLowerCase();
     
     filteredNotes = cachedNotes.filter(note => {
-        // 1. Pencocokan Judul
         const matchTitle = !query || note.title.toLowerCase().includes(query);
         
-        // 2. Pencocokan Tag
         const noteTags = (note.tags || '')
             .split(',')
             .map(t => t.trim().toLowerCase())
@@ -216,11 +248,14 @@ function renderNotesListTable() {
 }
 
 function handleSearchInput() {
+    const query = document.getElementById('search-input').value;
+    console.log(`[Search] Filter Kata Kunci Judul: "${query}"`);
     currentPage = 1;
     applyTitleSearchFilter();
 }
 
 function clearSearch() {
+    console.log("[UI Click] Tombol 'Clear Search' diklik");
     document.getElementById('search-input').value = '';
     selectedFilterTag = '';
     currentPage = 1;
@@ -229,6 +264,7 @@ function clearSearch() {
 
 function handleItemsPerPageChange() {
     itemsPerPage = parseInt(document.getElementById('items-per-page').value, 10);
+    console.log(`[Pagination] Mengubah Baris per Halaman -> ${itemsPerPage}`);
     currentPage = 1;
     renderNotesListTable();
 }
@@ -238,25 +274,31 @@ function changePage(direction) {
     currentPage += direction;
     if (currentPage < 1) currentPage = 1;
     if (currentPage > totalPages) currentPage = totalPages;
+    console.log(`[Pagination] Navigasi Halaman -> ${currentPage} dari ${totalPages}`);
     renderNotesListTable();
 }
 
 function selectNoteRow(globalIndex) {
     if (selectedNoteIndex === globalIndex) {
         selectedNoteIndex = null;
+        console.log(`[Table] Deselect row catatan`);
     } else {
         selectedNoteIndex = globalIndex;
+        const note = cachedNotes[globalIndex];
+        console.log(`[Table] Memilih row catatan (UUID: ${note.id})`);
     }
     renderNotesListTable();
 }
 
 function clearSelection() {
+    console.log("[UI Click] Tombol 'Batal Pilih' diklik");
     selectedNoteIndex = null;
     renderNotesListTable();
 }
 
 // Editor & CRUD Actions
 function openNewNoteEditor() {
+    console.log("[UI Click] Tombol '+ Catatan Baru' diklik");
     setFormData({ id: '', title: '', body: '', tags: '' }, "Buat Catatan Baru");
     originalFormData = { title: '', body: '', tags: '' };
     switchMode('EDITING');
@@ -265,12 +307,14 @@ function openNewNoteEditor() {
 function editSelectedNote() {
     if (selectedNoteIndex === null) return;
     const note = cachedNotes[selectedNoteIndex];
+    console.log(`[UI Click] Tombol 'Edit' diklik untuk Note UUID: ${note.id}`);
     setFormData({ id: note.id, title: note.title, body: note.body, tags: note.tags || '' }, `Edit Catatan (UUID: ${note.id})`);
     originalFormData = { title: note.title, body: note.body, tags: note.tags || '' };
     switchMode('EDITING');
 }
 
 function resetFormToInitial() {
+    console.log("[UI Click] Tombol 'Reset Form' diklik");
     setFormData(
         { 
             id: document.getElementById('note-id').value, 
@@ -285,6 +329,7 @@ function resetFormToInitial() {
 function readSelectedNote() {
     if (selectedNoteIndex === null) return;
     const note = cachedNotes[selectedNoteIndex];
+    console.log(`[UI Click] Tombol 'Baca Detail' diklik untuk Note UUID: ${note.id}`);
     setViewerData(note);
     switchMode('VIEWING');
 }
@@ -295,11 +340,18 @@ async function handleSaveNote(exitAfterSave = false) {
     const { id, title, body, tags } = getFormData();
     if (!title || !body) return alert("Judul dan Isi Catatan wajib diisi!");
 
+    const actionName = exitAfterSave ? 'Save & Exit' : 'Apply (Draft)';
+    console.log(`[UI Click] Tombol '${actionName}' diklik untuk ${id ? 'Update Note' : 'Create Note'}`);
+
     try {
         isSaving = true;
         setSaveButtonsLoading(true);
 
+        console.log("[Crypto] Membangkitkan Random 96-bit IVs & mengenkripsi AES-256-GCM...");
+        const startEncTime = performance.now();
         const encryptedPayload = await encryptNotePayload(title, body, currentCryptoKey);
+        console.log(`[Crypto] Enkripsi selesai (${Math.round(performance.now() - startEncTime)} ms)`);
+
         const payload = {
             encrypted_title: encryptedPayload.encrypted_title,
             encrypted_body: encryptedPayload.encrypted_body,
@@ -310,11 +362,14 @@ async function handleSaveNote(exitAfterSave = false) {
         let resultData;
         if (id) {
             payload.id = id;
+            console.log(`[API] Mengirim POST /api?action=update_note (UUID: ${id})...`);
             resultData = await updateNoteApi(payload);
         } else {
+            console.log("[API] Mengirim POST /api?action=create_note...");
             resultData = await createNoteApi(payload);
             if (resultData && resultData.id) {
                 document.getElementById('note-id').value = resultData.id;
+                console.log(`[API] Catatan Baru berhasil dibuat (UUID: ${resultData.id})`);
             }
         }
 
@@ -331,6 +386,7 @@ async function handleSaveNote(exitAfterSave = false) {
             document.getElementById('form-legend').textContent = `Edit Catatan (UUID: ${currentId})`;
         }
     } catch (err) {
+        console.error("[CRUD Error] Gagal menyimpan catatan:", err);
         alert("Error: " + err.message);
     } finally {
         isSaving = false;
@@ -342,15 +398,18 @@ async function deleteSelectedNote() {
     if (selectedNoteIndex === null) return;
     const note = cachedNotes[selectedNoteIndex];
 
+    console.log(`[UI Click] Tombol 'Hapus' diklik untuk Note UUID: ${note.id}`);
     if (!confirm(`Hapus catatan secara permanen? \nUUID: ${note.id}`)) return;
 
     try {
+        console.log(`[API] Mengirim POST /api?action=delete_note (UUID: ${note.id})...`);
         await deleteNoteApi(note.id);
         alert("Catatan berhasil dihapus.");
         switchMode('LIST');
         await fetchAndRenderNotes();
         await fetchAndRenderLogs();
     } catch (err) {
+        console.error("[CRUD Error] Gagal menghapus catatan:", err);
         alert("Error: " + err.message);
     }
 }
@@ -412,6 +471,7 @@ async function executePing() {
     } catch (err) {
         lastPingMs = null;
         lastPingStatusClass = 'red';
+        console.warn("[Network] PING Heartbeat Gagal - Server Unreachable");
     }
 }
 
@@ -438,6 +498,12 @@ function setupEventListeners() {
 
     document.getElementById('btn-clear-logs').addEventListener('click', handleClearLogs);
 
+    // Tombol Clear Terminal Monitor
+    document.getElementById('btn-clear-terminal').addEventListener('click', () => {
+        console.log("[UI Click] Tombol 'Clear Terminal' diklik");
+        clearTerminalScreen();
+    });
+
     // Auto-expand textarea
     const bodyTextarea = document.getElementById('note-body');
     if (bodyTextarea) {
@@ -446,7 +512,7 @@ function setupEventListeners() {
         });
     }
 
-    // Sinkronisasi tombol preset tag saat pengguna mengetik manual di input #note-tags
+    // Sinkronisasi tombol preset tag
     const tagsInput = document.getElementById('note-tags');
     if (tagsInput) {
         tagsInput.addEventListener('input', () => {
@@ -454,25 +520,27 @@ function setupEventListeners() {
         });
     }
 
-    // Event Delegation: Klik Tombol Tag Preset di Form Editor
+    // Event Delegation: Preset Tag Editor
     const editorTagContainer = document.getElementById('editor-tag-presets');
     if (editorTagContainer) {
         editorTagContainer.addEventListener('click', (e) => {
             const btn = e.target.closest('.editor-tag-btn');
             if (btn) {
                 const tag = btn.getAttribute('data-tag');
+                console.log(`[UI Click] Preset Tag #${tag} diklik di Editor`);
                 toggleTagInInput(tag);
             }
         });
     }
 
-    // Event Delegation: Klik Tombol Tag Filter di Atas Tabel Daftar Catatan
+    // Event Delegation: Tag Filter Daftar Catatan
     const listTagFilterContainer = document.getElementById('list-tag-filter-buttons');
     if (listTagFilterContainer) {
         listTagFilterContainer.addEventListener('click', (e) => {
             const btn = e.target.closest('.filter-tag-btn');
             if (btn) {
                 selectedFilterTag = btn.getAttribute('data-tag');
+                console.log(`[UI Click] Filter Tag '${selectedFilterTag || 'Semua'}' diklik`);
                 currentPage = 1;
                 applyTitleSearchFilter();
             }

@@ -11,6 +11,76 @@ const EMOJI_LIST = [
     '🚀', '🎯', '💎', '💣', '🪩'
 ];
 
+// Konfigurasi Maksimal Baris Terminal Layar
+const MAX_TERMINAL_LOGS = 50;
+let isConsoleIntercepted = false;
+
+/**
+ * Interceptor untuk menduplikasi console.log/warn/error ke Terminal Monitor Layar
+ */
+export function setupConsoleInterceptor() {
+    if (isConsoleIntercepted) return;
+    isConsoleIntercepted = true;
+
+    const origLog = console.log;
+    const origWarn = console.warn;
+    const origError = console.error;
+
+    console.log = function(...args) {
+        origLog.apply(console, args);
+        const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+        appendTerminalLine(msg, 'info');
+    };
+
+    console.warn = function(...args) {
+        origWarn.apply(console, args);
+        const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+        appendTerminalLine(msg, 'warn');
+    };
+
+    console.error = function(...args) {
+        origError.apply(console, args);
+        const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+        appendTerminalLine(msg, 'error');
+    };
+}
+
+/**
+ * Menambahkan baris log baru ke Terminal Monitor UI
+ */
+export function appendTerminalLine(message, type = 'info') {
+    const terminal = document.getElementById('terminal-screen');
+    if (!terminal) return;
+
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    const timeStr = `[${hours}:${minutes}:${seconds}]`;
+
+    const div = document.createElement('div');
+    div.className = `terminal-line ${type}`;
+    div.textContent = `${timeStr} ${message}`;
+
+    terminal.appendChild(div);
+
+    // Hapus baris tertua jika melebihi buffer 50 baris
+    while (terminal.children.length > MAX_TERMINAL_LOGS) {
+        terminal.removeChild(terminal.firstChild);
+    }
+
+    // Auto-scroll ke paling bawah
+    terminal.scrollTop = terminal.scrollHeight;
+}
+
+/**
+ * Membersihkan layar terminal
+ */
+export function clearTerminalScreen() {
+    const terminal = document.getElementById('terminal-screen');
+    if (terminal) terminal.innerHTML = '';
+}
+
 /**
  * Mengambil 1 emoji secara acak dari daftar EMOJI_LIST
  */
@@ -66,6 +136,7 @@ function injectEmojiButton() {
         titleInput.style.flex = '1';
 
         emojiBtn.addEventListener('click', () => {
+            console.log("[UI Click] Tombol Generator Emoji [🎲] diklik");
             const currentTitle = titleInput.value;
             const cleanTitle = stripLeadingEmoji(currentTitle);
             const newEmoji = getRandomEmoji();
@@ -150,7 +221,6 @@ export function renderListTagFilters(activeFilterTag) {
 
     container.innerHTML = '';
 
-    // Tombol [Semua Tag]
     const allBtn = document.createElement('button');
     allBtn.type = 'button';
     allBtn.className = `tag-btn filter-tag-btn ${!activeFilterTag ? 'active' : ''}`;
@@ -158,7 +228,6 @@ export function renderListTagFilters(activeFilterTag) {
     allBtn.textContent = 'Semua Tag';
     container.appendChild(allBtn);
 
-    // Tombol untuk setiap preset tag
     PRESET_TAGS.forEach(tag => {
         const btn = document.createElement('button');
         btn.type = 'button';
@@ -261,6 +330,7 @@ export function renderTopNavbar(activeMode, selectedNoteIndex) {
  * Mengatur visibilitas fieldset (Editor, Viewer, List) berdasarkan Mode
  */
 export function switchModeUI(newMode) {
+    console.log(`[UI] Perubahan Mode Tampilan -> ${newMode}`);
     const editorFieldset = document.getElementById('editor-fieldset');
     const editorBr = document.getElementById('editor-br');
     const viewerFieldset = document.getElementById('viewer-fieldset');

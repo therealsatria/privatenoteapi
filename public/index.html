@@ -166,6 +166,20 @@
                 </div>
             </fieldset>
 
+            <br>
+
+            <!-- REALTIME CONSOLE LOG MONITOR (TERMINAL DISPLAY) -->
+            <fieldset id="console-monitor-fieldset">
+                <legend><strong>Realtime Console Log Monitor</strong></legend>
+                <div class="terminal-header">
+                    <span style="font-size: 0.85em; color: #555;">Tampilan jejak log DevTools & interaksi tombol secara realtime</span>
+                    <button type="button" id="btn-clear-terminal" class="tag-btn">Clear Terminal</button>
+                </div>
+                <div id="terminal-screen" class="terminal-container">
+                    <!-- Baris terminal dirender dinamis lewat JS Interceptor -->
+                </div>
+            </fieldset>
+
         </div>
 
     </div>
