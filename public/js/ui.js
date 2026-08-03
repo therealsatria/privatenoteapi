@@ -98,6 +98,23 @@ export function autoExpandTextarea(element) {
     element.style.height = Math.max(160, element.scrollHeight) + 'px';
 }
 
+/**
+ * Pengunci status tombol Simpan saat proses async sedang berjalan (Mencegah Double Click)
+ */
+export function setSaveButtonsLoading(isLoading) {
+    const btnApply = document.getElementById('btn-nav-apply');
+    const btnSaveExit = document.getElementById('btn-nav-save-exit');
+
+    if (btnApply) {
+        btnApply.disabled = isLoading;
+        btnApply.textContent = isLoading ? 'Saving...' : 'Apply';
+    }
+    if (btnSaveExit) {
+        btnSaveExit.disabled = isLoading;
+        btnSaveExit.textContent = isLoading ? 'Saving...' : 'Save & Exit';
+    }
+}
+
 export function showLockedUI() {
     document.getElementById('lock-section').style.display = 'block';
     document.getElementById('app-section').style.display = 'none';

@@ -23,7 +23,8 @@ import {
     setViewerData,
     renderLogsTable,
     renderFooterMetrics,
-    autoExpandTextarea
+    autoExpandTextarea,
+    setSaveButtonsLoading
 } from './ui.js';
 
 // KONFIGURASI FLEKSIBEL: Jumlah baris log aktivitas yang ditampilkan
@@ -48,6 +49,10 @@ let pingTimer = null;
 let clockTimer = null;
 let lastPingMs = null;
 let lastPingStatusClass = 'orange';
+
+// GUARD FLAGS (Mencegah Double Submit & Penumpukan Event Listener)
+let isSaving = false;
+let isEventListenersBound = false;
 
 // Initialize Application
 async function initApp() {
@@ -263,11 +268,20 @@ function readSelectedNote() {
     switchMode('VIEWING');
 }
 
+/**
+ * Menyimpan Catatan (Dengan Proteksi Anti Double Submit & Loading State)
+ */
 async function handleSaveNote(exitAfterSave = false) {
+    // 1. Guard Flag: Cegah pengeksekusian ganda jika proses simpan sedang berjalan
+    if (isSaving) return;
+
     const { id, title, body, tags } = getFormData();
     if (!title || !body) return alert("Judul dan Isi Catatan wajib diisi!");
 
     try {
+        isSaving = true;
+        setSaveButtonsLoading(true); // Disable tombol simpan & ubah teks ke "Saving..."
+
         const encryptedPayload = await encryptNotePayload(title, body, currentCryptoKey);
         const payload = {
             encrypted_title: encryptedPayload.encrypted_title,
@@ -301,6 +315,10 @@ async function handleSaveNote(exitAfterSave = false) {
         }
     } catch (err) {
         alert("Error: " + err.message);
+    } finally {
+        // Lepas pengunci status simpan & aktifkan tombol kembali
+        isSaving = false;
+        setSaveButtonsLoading(false);
     }
 }
 
@@ -387,8 +405,12 @@ function startPeriodicPing() {
     pingTimer = setInterval(executePing, 15000);
 }
 
-// Global Event Listeners Setup
+// Global Event Listeners Setup (Dengan Proteksi Anti Penumpukan Event Listener)
 function setupEventListeners() {
+    // Kunci: Hanya pasang event listener 1 kali saja selama aplikasi berjalan
+    if (isEventListenersBound) return;
+    isEventListenersBound = true;
+
     document.getElementById('unlock-form').addEventListener('submit', handleUnlock);
     document.getElementById('btn-change-key').addEventListener('click', handleChangeKey);
     document.getElementById('btn-lock-key').addEventListener('click', handleLock);
@@ -401,7 +423,6 @@ function setupEventListeners() {
 
     document.getElementById('btn-clear-logs').addEventListener('click', handleClearLogs);
 
-    // Event Listener Auto-Expand Textarea Realtime saat Pengguna Mengetik
     const bodyTextarea = document.getElementById('note-body');
     if (bodyTextarea) {
         bodyTextarea.addEventListener('input', (e) => {
