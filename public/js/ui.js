@@ -32,7 +32,7 @@ export function stripLeadingEmoji(title) {
 }
 
 /**
- * Menyiapkan dan menyisipkan tombol Generator Emoji [🎲] di sebelah kiri input judul
+ * Menyiapkan dan menyisipkan tombol Generator Emoji [🎲] persis di sebelah kiri input judul (1 Baris Flex)
  */
 function injectEmojiButton() {
     const titleInput = document.getElementById('note-title');
@@ -45,13 +45,25 @@ function injectEmojiButton() {
         emojiBtn.id = 'btn-random-emoji';
         emojiBtn.title = 'Ganti Emoji Random';
         emojiBtn.textContent = '🎲';
-        emojiBtn.style.marginRight = '6px';
         emojiBtn.style.padding = '8px 12px';
         emojiBtn.style.cursor = 'pointer';
         emojiBtn.style.fontWeight = 'bold';
+        emojiBtn.style.whiteSpace = 'nowrap';
 
-        // Sisipkan tombol tepat di sebelah kiri input judul
-        titleInput.parentNode.insertBefore(emojiBtn, titleInput);
+        // 1. Buat kontainer flex agar tombol dan input judul sejajar persis 1 baris
+        const flexGroup = document.createElement('div');
+        flexGroup.style.display = 'flex';
+        flexGroup.style.alignItems = 'center';
+        flexGroup.style.gap = '6px';
+        flexGroup.style.width = '100%';
+
+        // 2. Masukkan tombol dan input judul ke dalam kontainer flex
+        titleInput.parentNode.insertBefore(flexGroup, titleInput);
+        flexGroup.appendChild(emojiBtn);
+        flexGroup.appendChild(titleInput);
+
+        // 3. Buat input judul mengisi sisa ruang di sebelah kanan tombol
+        titleInput.style.flex = '1';
 
         // Handler klik tombol generator emoji
         emojiBtn.addEventListener('click', () => {
