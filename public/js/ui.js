@@ -1,5 +1,69 @@
 /* public/js/ui.js */
 
+// Daftar Emoticon Random
+const EMOJI_LIST = [
+    '📌', '📍', '🔹', '🔸', '➡️', '➔', '📝', '✍️', '✅', '☑️', 
+    '⏳', '⏰', '💡', '📅', '🗓️', '🏷️', '📂', '📁', '⚠️', '🚨', 
+    '✨', '🌟', '☕', '🔒', '🔥', '💧', '⚡', '🧊', '🌪️', '💥', 
+    '🚀', '🎯', '💎', '💣', '🪩'
+];
+
+/**
+ * Mengambil 1 emoji secara acak dari daftar EMOJI_LIST
+ */
+export function getRandomEmoji() {
+    const randomIndex = Math.floor(Math.random() * EMOJI_LIST.length);
+    return EMOJI_LIST[randomIndex];
+}
+
+/**
+ * Menghapus emoji lama yang berada di deretan paling kiri judul
+ */
+export function stripLeadingEmoji(title) {
+    if (!title) return '';
+    let trimmed = title.trimStart();
+    for (const emoji of EMOJI_LIST) {
+        if (trimmed.startsWith(emoji)) {
+            trimmed = trimmed.slice(emoji.length).trimStart();
+            break;
+        }
+    }
+    return trimmed;
+}
+
+/**
+ * Menyiapkan dan menyisipkan tombol Generator Emoji [🎲] di sebelah kiri input judul
+ */
+function injectEmojiButton() {
+    const titleInput = document.getElementById('note-title');
+    if (!titleInput) return;
+
+    let emojiBtn = document.getElementById('btn-random-emoji');
+    if (!emojiBtn) {
+        emojiBtn = document.createElement('button');
+        emojiBtn.type = 'button';
+        emojiBtn.id = 'btn-random-emoji';
+        emojiBtn.title = 'Ganti Emoji Random';
+        emojiBtn.textContent = '🎲';
+        emojiBtn.style.marginRight = '6px';
+        emojiBtn.style.padding = '8px 12px';
+        emojiBtn.style.cursor = 'pointer';
+        emojiBtn.style.fontWeight = 'bold';
+
+        // Sisipkan tombol tepat di sebelah kiri input judul
+        titleInput.parentNode.insertBefore(emojiBtn, titleInput);
+
+        // Handler klik tombol generator emoji
+        emojiBtn.addEventListener('click', () => {
+            const currentTitle = titleInput.value;
+            const cleanTitle = stripLeadingEmoji(currentTitle);
+            const newEmoji = getRandomEmoji();
+            titleInput.value = `${newEmoji} ${cleanTitle}`;
+            titleInput.focus();
+        });
+    }
+}
+
 /**
  * Mencegah serangan Stored XSS dengan escaping karakter HTML
  */
@@ -90,9 +154,12 @@ export function switchModeUI(newMode) {
         editorBr.style.display = 'block';
         viewerFieldset.style.display = 'none';
         viewerBr.style.display = 'none';
+
+        // Injeksi tombol generator emoji saat mode editor aktif
+        injectEmojiButton();
+
         window.scrollTo({ top: editorFieldset.offsetTop - 60, behavior: 'smooth' });
         
-        // Auto-expand tinggi textarea saat mode editor dibuka
         const bodyTextarea = document.getElementById('note-body');
         if (bodyTextarea) autoExpandTextarea(bodyTextarea);
     } else if (newMode === 'VIEWING') {
@@ -167,7 +234,15 @@ export function getFormData() {
  */
 export function setFormData({ id = '', title = '', body = '', tags = '' }, legendText = "Buat Catatan Baru") {
     document.getElementById('note-id').value = id;
-    document.getElementById('note-title').value = title;
+    
+    const titleInput = document.getElementById('note-title');
+    
+    // Jika Catatan Baru (id kosong & title kosong), otomatis beri 1 emoji random + spasi
+    if (!id && !title) {
+        titleInput.value = `${getRandomEmoji()} `;
+    } else {
+        titleInput.value = title;
+    }
     
     const bodyTextarea = document.getElementById('note-body');
     bodyTextarea.value = body;
@@ -175,7 +250,8 @@ export function setFormData({ id = '', title = '', body = '', tags = '' }, legen
     document.getElementById('note-tags').value = tags;
     document.getElementById('form-legend').textContent = legendText;
 
-    // Memicu auto-expand tinggi saat data dimasukkan ke editor
+    // Pastikan tombol emoji sudah ada & sesuaikan tinggi textarea
+    injectEmojiButton();
     autoExpandTextarea(bodyTextarea);
 }
 
