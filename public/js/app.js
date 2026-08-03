@@ -24,7 +24,10 @@ import {
     renderLogsTable,
     renderFooterMetrics,
     autoExpandTextarea,
-    setSaveButtonsLoading
+    setSaveButtonsLoading,
+    renderListTagFilters,
+    toggleTagInInput,
+    updateEditorTagButtonStates
 } from './ui.js';
 
 // KONFIGURASI FLEKSIBEL: Jumlah baris log aktivitas yang ditampilkan
@@ -39,6 +42,9 @@ let activeMode = 'LIST'; // Options: 'LIST' | 'EDITING' | 'VIEWING'
 let selectedNoteIndex = null;
 let originalFormData = { title: '', body: '', tags: '' };
 
+// Tag Filter State
+let selectedFilterTag = ''; // Tag yang sedang dipilih untuk penyaringan di tabel
+
 let currentPage = 1;
 let itemsPerPage = 10;
 
@@ -50,7 +56,7 @@ let clockTimer = null;
 let lastPingMs = null;
 let lastPingStatusClass = 'orange';
 
-// GUARD FLAGS (Mencegah Double Submit & Penumpukan Event Listener)
+// GUARD FLAGS
 let isSaving = false;
 let isEventListenersBound = false;
 
@@ -97,6 +103,7 @@ async function handleLock() {
     cachedNotes = [];
     filteredNotes = [];
     selectedNoteIndex = null;
+    selectedFilterTag = '';
     
     switchMode('LIST');
     showLockedUI();
@@ -180,15 +187,27 @@ async function handleClearLogs() {
     }
 }
 
-// Filter Title-Only & Pagination
+// Filter Ganda (Kata Kunci Judul DAN Filter Tag)
 function applyTitleSearchFilter() {
     const query = document.getElementById('search-input').value.trim().toLowerCase();
-    if (!query) {
-        filteredNotes = [...cachedNotes];
-    } else {
-        filteredNotes = cachedNotes.filter(n => n.title.toLowerCase().includes(query));
-    }
+    
+    filteredNotes = cachedNotes.filter(note => {
+        // 1. Pencocokan Judul
+        const matchTitle = !query || note.title.toLowerCase().includes(query);
+        
+        // 2. Pencocokan Tag
+        const noteTags = (note.tags || '')
+            .split(',')
+            .map(t => t.trim().toLowerCase())
+            .filter(Boolean);
+            
+        const matchTag = !selectedFilterTag || noteTags.includes(selectedFilterTag.toLowerCase());
+        
+        return matchTitle && matchTag;
+    });
+
     renderNotesListTable();
+    renderListTagFilters(selectedFilterTag);
 }
 
 function renderNotesListTable() {
@@ -203,7 +222,9 @@ function handleSearchInput() {
 
 function clearSearch() {
     document.getElementById('search-input').value = '';
-    handleSearchInput();
+    selectedFilterTag = '';
+    currentPage = 1;
+    applyTitleSearchFilter();
 }
 
 function handleItemsPerPageChange() {
@@ -268,11 +289,7 @@ function readSelectedNote() {
     switchMode('VIEWING');
 }
 
-/**
- * Menyimpan Catatan (Dengan Proteksi Anti Double Submit & Loading State)
- */
 async function handleSaveNote(exitAfterSave = false) {
-    // 1. Guard Flag: Cegah pengeksekusian ganda jika proses simpan sedang berjalan
     if (isSaving) return;
 
     const { id, title, body, tags } = getFormData();
@@ -280,7 +297,7 @@ async function handleSaveNote(exitAfterSave = false) {
 
     try {
         isSaving = true;
-        setSaveButtonsLoading(true); // Disable tombol simpan & ubah teks ke "Saving..."
+        setSaveButtonsLoading(true);
 
         const encryptedPayload = await encryptNotePayload(title, body, currentCryptoKey);
         const payload = {
@@ -316,7 +333,6 @@ async function handleSaveNote(exitAfterSave = false) {
     } catch (err) {
         alert("Error: " + err.message);
     } finally {
-        // Lepas pengunci status simpan & aktifkan tombol kembali
         isSaving = false;
         setSaveButtonsLoading(false);
     }
@@ -405,9 +421,8 @@ function startPeriodicPing() {
     pingTimer = setInterval(executePing, 15000);
 }
 
-// Global Event Listeners Setup (Dengan Proteksi Anti Penumpukan Event Listener)
+// Global Event Listeners Setup
 function setupEventListeners() {
-    // Kunci: Hanya pasang event listener 1 kali saja selama aplikasi berjalan
     if (isEventListenersBound) return;
     isEventListenersBound = true;
 
@@ -423,10 +438,44 @@ function setupEventListeners() {
 
     document.getElementById('btn-clear-logs').addEventListener('click', handleClearLogs);
 
+    // Auto-expand textarea
     const bodyTextarea = document.getElementById('note-body');
     if (bodyTextarea) {
         bodyTextarea.addEventListener('input', (e) => {
             autoExpandTextarea(e.target);
+        });
+    }
+
+    // Sinkronisasi tombol preset tag saat pengguna mengetik manual di input #note-tags
+    const tagsInput = document.getElementById('note-tags');
+    if (tagsInput) {
+        tagsInput.addEventListener('input', () => {
+            updateEditorTagButtonStates();
+        });
+    }
+
+    // Event Delegation: Klik Tombol Tag Preset di Form Editor
+    const editorTagContainer = document.getElementById('editor-tag-presets');
+    if (editorTagContainer) {
+        editorTagContainer.addEventListener('click', (e) => {
+            const btn = e.target.closest('.editor-tag-btn');
+            if (btn) {
+                const tag = btn.getAttribute('data-tag');
+                toggleTagInInput(tag);
+            }
+        });
+    }
+
+    // Event Delegation: Klik Tombol Tag Filter di Atas Tabel Daftar Catatan
+    const listTagFilterContainer = document.getElementById('list-tag-filter-buttons');
+    if (listTagFilterContainer) {
+        listTagFilterContainer.addEventListener('click', (e) => {
+            const btn = e.target.closest('.filter-tag-btn');
+            if (btn) {
+                selectedFilterTag = btn.getAttribute('data-tag');
+                currentPage = 1;
+                applyTitleSearchFilter();
+            }
         });
     }
 

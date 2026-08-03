@@ -64,6 +64,8 @@
                     <div>
                         <label for="note-tags">Tag (Opsional, pisahkan dengan koma):</label><br>
                         <input type="text" id="note-tags" placeholder="pribadi, finansial">
+                        <!-- Container Quick Tag Presets di Form Editor -->
+                        <div id="editor-tag-presets" class="tag-btn-group"></div>
                     </div>
                 </form>
             </fieldset>
@@ -102,6 +104,12 @@
                             <option value="100">100</option>
                         </select>
                     </div>
+                </div>
+
+                <!-- Container Quick Tag Filters di Atas Tabel Daftar Catatan -->
+                <div class="tag-filter-bar">
+                    <strong style="font-size: 0.85em;">Filter Tag:</strong>
+                    <div id="list-tag-filter-buttons" class="tag-btn-group" style="margin-top: 0;"></div>
                 </div>
 
                 <!-- Tabel Data Catatan -->

@@ -1,5 +1,8 @@
 /* public/js/ui.js */
 
+// Daftar Preset Tag Default
+export const PRESET_TAGS = ['akun', 'todo', 'pribadi', 'kerja', 'umum'];
+
 // Daftar Emoticon Random
 const EMOJI_LIST = [
     '📌', '📍', '🔹', '🔸', '➡️', '➔', '📝', '✍️', '✅', '☑️', 
@@ -32,7 +35,7 @@ export function stripLeadingEmoji(title) {
 }
 
 /**
- * Menyiapkan dan menyisipkan tombol Generator Emoji [🎲] persis di sebelah kiri input judul (1 Baris Flex)
+ * Menyiapkan dan menyisipkan tombol Generator Emoji [🎲] persis di sebelah kiri input judul
  */
 function injectEmojiButton() {
     const titleInput = document.getElementById('note-title');
@@ -50,22 +53,18 @@ function injectEmojiButton() {
         emojiBtn.style.fontWeight = 'bold';
         emojiBtn.style.whiteSpace = 'nowrap';
 
-        // 1. Buat kontainer flex agar tombol dan input judul sejajar persis 1 baris
         const flexGroup = document.createElement('div');
         flexGroup.style.display = 'flex';
         flexGroup.style.alignItems = 'center';
         flexGroup.style.gap = '6px';
         flexGroup.style.width = '100%';
 
-        // 2. Masukkan tombol dan input judul ke dalam kontainer flex
         titleInput.parentNode.insertBefore(flexGroup, titleInput);
         flexGroup.appendChild(emojiBtn);
         flexGroup.appendChild(titleInput);
 
-        // 3. Buat input judul mengisi sisa ruang di sebelah kanan tombol
         titleInput.style.flex = '1';
 
-        // Handler klik tombol generator emoji
         emojiBtn.addEventListener('click', () => {
             const currentTitle = titleInput.value;
             const cleanTitle = stripLeadingEmoji(currentTitle);
@@ -74,6 +73,100 @@ function injectEmojiButton() {
             titleInput.focus();
         });
     }
+}
+
+/**
+ * Merender Tombol Preset Tag di Form Editor
+ */
+export function renderEditorTagPresets() {
+    const container = document.getElementById('editor-tag-presets');
+    if (!container) return;
+
+    container.innerHTML = '';
+    PRESET_TAGS.forEach(tag => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'tag-btn editor-tag-btn';
+        btn.setAttribute('data-tag', tag);
+        btn.textContent = `#${tag}`;
+        container.appendChild(btn);
+    });
+
+    updateEditorTagButtonStates();
+}
+
+/**
+ * Memperbarui status tombol tag aktif (biru) jika tag tersebut ada di input teks #note-tags
+ */
+export function updateEditorTagButtonStates() {
+    const tagsInput = document.getElementById('note-tags');
+    if (!tagsInput) return;
+
+    const currentTags = tagsInput.value
+        .split(',')
+        .map(t => t.trim().toLowerCase())
+        .filter(Boolean);
+
+    const buttons = document.querySelectorAll('.editor-tag-btn');
+    buttons.forEach(btn => {
+        const tag = btn.getAttribute('data-tag').toLowerCase();
+        if (currentTags.includes(tag)) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+}
+
+/**
+ * Toggle (Tambah / Hapus) tag pada kolom input teks #note-tags saat tombol preset diklik
+ */
+export function toggleTagInInput(tag) {
+    const tagsInput = document.getElementById('note-tags');
+    if (!tagsInput) return;
+
+    let currentTags = tagsInput.value
+        .split(',')
+        .map(t => t.trim().toLowerCase())
+        .filter(Boolean);
+
+    const lowerTag = tag.toLowerCase();
+    if (currentTags.includes(lowerTag)) {
+        currentTags = currentTags.filter(t => t !== lowerTag);
+    } else {
+        currentTags.push(lowerTag);
+    }
+
+    tagsInput.value = currentTags.join(', ');
+    updateEditorTagButtonStates();
+}
+
+/**
+ * Merender Tombol Filter Tag di Atas Tabel Daftar Catatan
+ */
+export function renderListTagFilters(activeFilterTag) {
+    const container = document.getElementById('list-tag-filter-buttons');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    // Tombol [Semua Tag]
+    const allBtn = document.createElement('button');
+    allBtn.type = 'button';
+    allBtn.className = `tag-btn filter-tag-btn ${!activeFilterTag ? 'active' : ''}`;
+    allBtn.setAttribute('data-tag', '');
+    allBtn.textContent = 'Semua Tag';
+    container.appendChild(allBtn);
+
+    // Tombol untuk setiap preset tag
+    PRESET_TAGS.forEach(tag => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `tag-btn filter-tag-btn ${activeFilterTag === tag ? 'active' : ''}`;
+        btn.setAttribute('data-tag', tag);
+        btn.textContent = `#${tag}`;
+        container.appendChild(btn);
+    });
 }
 
 /**
@@ -99,7 +192,7 @@ export function autoExpandTextarea(element) {
 }
 
 /**
- * Pengunci status tombol Simpan saat proses async sedang berjalan (Mencegah Double Click)
+ * Pengunci status tombol Simpan saat proses async sedang berjalan
  */
 export function setSaveButtonsLoading(isLoading) {
     const btnApply = document.getElementById('btn-nav-apply');
@@ -184,8 +277,8 @@ export function switchModeUI(newMode) {
         viewerFieldset.style.display = 'none';
         viewerBr.style.display = 'none';
 
-        // Injeksi tombol generator emoji saat mode editor aktif
         injectEmojiButton();
+        renderEditorTagPresets();
 
         window.scrollTo({ top: editorFieldset.offsetTop - 60, behavior: 'smooth' });
         
@@ -265,8 +358,6 @@ export function setFormData({ id = '', title = '', body = '', tags = '' }, legen
     document.getElementById('note-id').value = id;
     
     const titleInput = document.getElementById('note-title');
-    
-    // Jika Catatan Baru (id kosong & title kosong), otomatis beri 1 emoji random + spasi
     if (!id && !title) {
         titleInput.value = `${getRandomEmoji()} `;
     } else {
@@ -279,8 +370,8 @@ export function setFormData({ id = '', title = '', body = '', tags = '' }, legen
     document.getElementById('note-tags').value = tags;
     document.getElementById('form-legend').textContent = legendText;
 
-    // Pastikan tombol emoji sudah ada & sesuaikan tinggi textarea
     injectEmojiButton();
+    renderEditorTagPresets();
     autoExpandTextarea(bodyTextarea);
 }
 

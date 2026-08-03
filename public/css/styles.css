@@ -103,7 +103,7 @@ legend {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 15px;
+    margin-bottom: 10px;
     flex-wrap: wrap;
     gap: 10px;
 }
@@ -188,11 +188,54 @@ pre {
 #note-body {
     min-height: 160px;
     resize: vertical;
-    overflow-y: hidden; /* Mencegah scrollbar internal saat auto-expand */
+    overflow-y: hidden;
     line-height: 1.5;
 }
 
-/* 6. BOTTOM FIXED FOOTER */
+/* 6. TAG TOGGLE BUTTONS STYLING */
+.tag-btn-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.tag-btn {
+    background-color: #f0f0f0;
+    color: #333;
+    border: 1px solid #ccc;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.8em;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.15s ease;
+}
+
+.tag-btn:hover {
+    background-color: #e0e0e0;
+}
+
+.tag-btn.active {
+    background-color: #007bff;
+    color: #fff;
+    border-color: #0056b3;
+    font-weight: bold;
+}
+
+.tag-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 15px;
+    padding: 8px 10px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    border: 1px dashed #ddd;
+}
+
+/* 7. BOTTOM FIXED FOOTER */
 #bottom-footer {
     position: fixed;
     bottom: 0;
