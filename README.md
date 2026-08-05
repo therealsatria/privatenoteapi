@@ -2,7 +2,7 @@
 
 **private note** adalah web aplikasi catatan pribadi dengan arsitektur **Pure Zero-Knowledge (ZK)**. Seluruh proses enkripsi dan dekripsi data dilakukan secara *Client-Side* di dalam browser pengguna menggunakan **Web Crypto API (AES-256-GCM)**. 
 
-Server (Vercel) dan Database (Neon PostgreSQL) hanya bertindak sebagai media lalu lintas dan tempat penyimpanan *ciphertext* (data terenkripsi). Server sama sekali **tidak memiliki kunci** untuk membaca judul maupun isi catatan pengguna. Aplikasi ini juga dilengkapi dengan proteksi gerbang API (*Gateway Key*), pembatas *request* (*Rate Limiting*), dan jejak audit lengkap (*Audit Trail & Console Monitor*).
+Server (Vercel) dan Database (Neon PostgreSQL) hanya bertindak sebagai media lalu lintas dan tempat penyimpanan *ciphertext* (data terenkripsi). Server sama sekali **tidak memiliki kunci** untuk membaca judul maupun isi catatan pengguna. Aplikasi ini juga dilengkapi dengan proteksi gerbang API (*Gateway Key*), pembatas *request* (*Rate Limiting*), dan jejak audit lengkap (*Audit Trail & Realtime Console Monitor*).
 
 ---
 
@@ -23,14 +23,15 @@ private-notes/
 ├── api/
 │   └── index.js            <-- Backend Serverless Function (Gateway, Rate Limiter, Vercel & Neon DB)
 ├── public/
-│   ├── index.html          <-- Clean Skeleton HTML5
+│   ├── index.html          <-- Clean Skeleton HTML5 (Dengan Top Header Permanen & Terminal Display)
 │   ├── css/
-│   │   └── styles.css      <-- Responsive Styles, Top Header, Terminal, Tag Presets, & Footer
+│   │   └── styles.css      <-- Responsive Styles, Action Bars, Terminal, Tag Presets, & Footer
 │   └── js/
 │       ├── crypto.js       <-- Web Crypto API (AES-GCM, SHA-256, Dual IVs)
 │       ├── api.js          <-- Fetch Client Wrapper (Dengan Header x-gateway-key)
 │       ├── ui.js           <-- DOM Helper, Terminal Interceptor, Auto-Expand Textarea, & Tag/Emoji Presets
 │       └── app.js          <-- Controller Utama, RAM State Manager, Anti-Double Submit, & Footer Metrics
+├── build.js                <-- Script Opsional Build & Obfuscator (Output: dist/)
 ├── package.json            <-- Dependency proyek (@neondatabase/serverless)
 └── README.md               <-- Dokumentasi Arsitektur Proyek
 ```
@@ -88,34 +89,43 @@ Aplikasi menggunakan **5 Lapisan Perlindungan**:
 
 ## ✨ Fitur-Fitur Utama & Workflow UI/UX
 
-1. **Top Sticky Navbar (Global Header):**
-   * Menempel di bagian atas layar (`position: sticky; top: 0`) dengan logo `private note` dan tombol kontrol sesi vault (`[Change Key]` & `[Lock Vault]`).
+1. **Top Sticky Navbar (Global Header Permanen):**
+   * Menempel di bagian atas layar (`position: sticky; top: 0`) dengan logo `private note`, indikator status teks hijau `● Unlocked`, serta tombol kontrol sesi vault (`[Change Key]` & `[Lock Vault]`) yang **statis dan tidak pernah hilang**.
+   * Area utama bebas dari blok redundan "Status Sesi Vault".
+
 2. **Navigasi Tombol Aksi Lokal (Hukum Kedekatan / Law of Proximity):**
    * **Aksi Baris Tabel (1-Klik):** Menggunakan icon instan `👁️` (Baca), `✏️` (Edit), dan `🗑️` (Hapus) langsung di kolom *Aksi* setiap baris catatan.
    * **Toolbar Tabel:** Tombol `[+ Catatan Baru]` dan `[Refresh]` terletak di toolbar atas tabel.
    * **Form Editor:** Tombol `[Apply]`, `[Save & Exit]`, `[Reset]`, `[Batal]` terletak tepat di bawah *textarea* tempat menulis.
    * **Viewer Detail:** Tombol `[Edit Catatan Ini]`, `[Hapus Catatan Ini]`, `[Tutup Detail]` terletak tepat di bawah teks detail catatan.
+
 3. **Form Editor Responsif 100% Fluid & Auto-Expand Textarea:**
    * Lebar form 100% fluid memenuhi container.
    * Tinggi *textarea* isi catatan bertambah otomatis secara *real-time* mengikuti panjangnya ketikan pengguna (`autoExpandTextarea`).
+
 4. **Random Emoji Generator (`[🎲]`) & Auto-Prepend Title:**
    * Judul catatan baru otomatis diawali dengan 1 emoji acak.
    * Tombol `[🎲]` di sebelah kiri input judul secara otomatis mengganti/menukar emoji paling kiri tanpa merusak teks judul.
+
 5. **Quick Tag Presets & Multi-Filtering:**
    * Tombol tag preset (`#akun`, `#todo`, `#pribadi`, `#kerja`, `#umum`) di Form Editor. Klik tombol untuk menambah/menghapus tag dari kolom input.
    * Baris filter tag di atas tabel daftar catatan. Pencarian kata kunci Judul dan Filter Tag bekerja secara bersamaan (*real-time multi-filtering*).
+
 6. **Title-Only Search & Pagination:**
    * Pencarian kata kunci judul yang sangat cepat di RAM tanpa overhead dekripsi ulang.
    * Pengaturan halaman (Pagination) dengan pilihan baris data: 10, 30, 50, atau 100 baris.
+
 7. **Tabel Log Aktivitas Terakhir & Total Count:**
    * Menampilkan N log aktivitas terbaru secara langsung di bawah halaman utama (`LOG_LIMIT = 3`).
    * Menampilkan informasi **`Total Log: X Data`** dan tombol `[Clear All Logs]` untuk pembersihan manual.
+
 8. **Realtime Metrics Footer:**
    * Baris footer melayang di paling bawah layar (`position: fixed; bottom: 0`).
    * **Resolusi:** Ukuran Viewport aktif & Layar Monitor (`1280x720 px (Screen: 1920x1080 px)`) yang update otomatis saat browser di-resize.
    * **Jam Realtime:** Tanggal, jam, dan milidetik (`Epoch ms`).
    * **Geolocation:** IP Address & Region pengunjung (via Vercel Edge Headers).
    * **API Latency Ping Dot:** Indikator lingkaran warna (🟢 `<300ms`, 🟠 `<1000ms`, 🔴 Offline/Error) dengan periodic ping 15 detik (otomatis *pause* saat tab tidak aktif).
+
 9. **Realtime Terminal Console Monitor:**
    * Layar terminal *Dark Theme* di dalam web yang menayangkan jejak log DevTools & klik tombol secara *real-time* lewat *Console Interceptor*.
    * Dilengkapi tombol `[Clear Terminal]` dan *buffer limit* 50 baris dengan *auto-scroll*.
