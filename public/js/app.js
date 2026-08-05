@@ -41,7 +41,7 @@ let cachedNotes = [];
 let filteredNotes = [];
 
 let activeMode = 'LIST'; // Options: 'LIST' | 'EDITING' | 'VIEWING'
-let selectedNoteIndex = null;
+let activeNoteIndex = null; // Indeks catatan yang sedang aktif dibuka/diedit
 let originalFormData = { title: '', body: '', tags: '' };
 
 // Tag Filter State
@@ -64,7 +64,7 @@ let isEventListenersBound = false;
 
 // Initialize Application
 async function initApp() {
-    setupConsoleInterceptor(); // Aktifkan Interceptor Console Log ke Terminal Screen
+    setupConsoleInterceptor();
     console.log("[App] Inisialisasi aplikasi 'private note'...");
     
     setupEventListeners();
@@ -109,7 +109,7 @@ async function handleUnlock(event) {
 }
 
 async function handleLock() {
-    console.log("[UI Click] Tombol 'Lock / Release Key' diklik");
+    console.log("[UI Click] Tombol 'Lock Vault' diklik");
     console.log("[Vault] Memulai proses penguncian Vault & pembersihan RAM...");
     
     await logVaultEventApi('RELEASE_KEY');
@@ -118,7 +118,7 @@ async function handleLock() {
     currentCryptoKey = null;
     cachedNotes = [];
     filteredNotes = [];
-    selectedNoteIndex = null;
+    activeNoteIndex = null;
     selectedFilterTag = '';
     
     switchMode('LIST');
@@ -148,11 +148,11 @@ async function handleChangeKey() {
 function switchMode(newMode) {
     activeMode = newMode;
     if (newMode === 'LIST') {
-        selectedNoteIndex = null;
+        activeNoteIndex = null;
     }
     switchModeUI(newMode);
     renderNotesListTable();
-    renderTopNavbar(activeMode, selectedNoteIndex);
+    renderTopNavbar();
 }
 
 // Fetch & Decrypt Notes
@@ -243,8 +243,8 @@ function applyTitleSearchFilter() {
 }
 
 function renderNotesListTable() {
-    renderNotesTable(filteredNotes, cachedNotes, selectedNoteIndex, currentPage, itemsPerPage);
-    renderTopNavbar(activeMode, selectedNoteIndex);
+    renderNotesTable(filteredNotes, cachedNotes, currentPage, itemsPerPage);
+    renderTopNavbar();
 }
 
 function handleSearchInput() {
@@ -278,39 +278,34 @@ function changePage(direction) {
     renderNotesListTable();
 }
 
-function selectNoteRow(globalIndex) {
-    if (selectedNoteIndex === globalIndex) {
-        selectedNoteIndex = null;
-        console.log(`[Table] Deselect row catatan`);
-    } else {
-        selectedNoteIndex = globalIndex;
-        const note = cachedNotes[globalIndex];
-        console.log(`[Table] Memilih row catatan (UUID: ${note.id})`);
-    }
-    renderNotesListTable();
-}
-
-function clearSelection() {
-    console.log("[UI Click] Tombol 'Batal Pilih' diklik");
-    selectedNoteIndex = null;
-    renderNotesListTable();
-}
-
 // Editor & CRUD Actions
 function openNewNoteEditor() {
     console.log("[UI Click] Tombol '+ Catatan Baru' diklik");
+    activeNoteIndex = null;
     setFormData({ id: '', title: '', body: '', tags: '' }, "Buat Catatan Baru");
     originalFormData = { title: '', body: '', tags: '' };
     switchMode('EDITING');
 }
 
-function editSelectedNote() {
-    if (selectedNoteIndex === null) return;
-    const note = cachedNotes[selectedNoteIndex];
-    console.log(`[UI Click] Tombol 'Edit' diklik untuk Note UUID: ${note.id}`);
+function editNoteByIndex(globalIndex) {
+    activeNoteIndex = globalIndex;
+    const note = cachedNotes[globalIndex];
+    if (!note) return;
+
+    console.log(`[UI Click] Icon '✏️ Edit' diklik untuk Note UUID: ${note.id}`);
     setFormData({ id: note.id, title: note.title, body: note.body, tags: note.tags || '' }, `Edit Catatan (UUID: ${note.id})`);
     originalFormData = { title: note.title, body: note.body, tags: note.tags || '' };
     switchMode('EDITING');
+}
+
+function readNoteByIndex(globalIndex) {
+    activeNoteIndex = globalIndex;
+    const note = cachedNotes[globalIndex];
+    if (!note) return;
+
+    console.log(`[UI Click] Icon '👁️ Baca' diklik untuk Note UUID: ${note.id}`);
+    setViewerData(note);
+    switchMode('VIEWING');
 }
 
 function resetFormToInitial() {
@@ -324,14 +319,6 @@ function resetFormToInitial() {
         }, 
         document.getElementById('form-legend').textContent
     );
-}
-
-function readSelectedNote() {
-    if (selectedNoteIndex === null) return;
-    const note = cachedNotes[selectedNoteIndex];
-    console.log(`[UI Click] Tombol 'Baca Detail' diklik untuk Note UUID: ${note.id}`);
-    setViewerData(note);
-    switchMode('VIEWING');
 }
 
 async function handleSaveNote(exitAfterSave = false) {
@@ -394,11 +381,11 @@ async function handleSaveNote(exitAfterSave = false) {
     }
 }
 
-async function deleteSelectedNote() {
-    if (selectedNoteIndex === null) return;
-    const note = cachedNotes[selectedNoteIndex];
+async function deleteNoteByIndex(globalIndex) {
+    const note = cachedNotes[globalIndex];
+    if (!note) return;
 
-    console.log(`[UI Click] Tombol 'Hapus' diklik untuk Note UUID: ${note.id}`);
+    console.log(`[UI Click] Icon '🗑️ Hapus' diklik untuk Note UUID: ${note.id}`);
     if (!confirm(`Hapus catatan secara permanen? \nUUID: ${note.id}`)) return;
 
     try {
@@ -490,6 +477,42 @@ function setupEventListeners() {
     document.getElementById('btn-change-key').addEventListener('click', handleChangeKey);
     document.getElementById('btn-lock-key').addEventListener('click', handleLock);
 
+    // Top Sticky Navbar Controls (Global Session Header)
+    document.getElementById('navbar-buttons').addEventListener('click', (e) => {
+        if (e.target.id === 'btn-top-change-key') handleChangeKey();
+        else if (e.target.id === 'btn-top-lock-key') handleLock();
+    });
+
+    // Toolbar Atas Tabel (+ Catatan Baru & Refresh)
+    document.getElementById('btn-list-new').addEventListener('click', openNewNoteEditor);
+    document.getElementById('btn-list-refresh').addEventListener('click', () => {
+        console.log("[UI Click] Tombol 'Refresh' diklik");
+        fetchAndRenderNotes();
+        fetchAndRenderLogs();
+    });
+
+    // Form Editor Local Action Buttons (Tepat di Bawah Form/Textarea)
+    document.getElementById('btn-editor-apply').addEventListener('click', () => handleSaveNote(false));
+    document.getElementById('btn-editor-save-exit').addEventListener('click', () => handleSaveNote(true));
+    document.getElementById('btn-editor-reset').addEventListener('click', resetFormToInitial);
+    document.getElementById('btn-editor-cancel').addEventListener('click', () => {
+        console.log("[UI Click] Tombol 'Batal Editor' diklik");
+        switchMode('LIST');
+    });
+
+    // Viewer Local Action Buttons (Tepat di Bawah Detail Catatan)
+    document.getElementById('btn-viewer-edit').addEventListener('click', () => {
+        if (activeNoteIndex !== null) editNoteByIndex(activeNoteIndex);
+    });
+    document.getElementById('btn-viewer-delete').addEventListener('click', () => {
+        if (activeNoteIndex !== null) deleteNoteByIndex(activeNoteIndex);
+    });
+    document.getElementById('btn-viewer-close').addEventListener('click', () => {
+        console.log("[UI Click] Tombol 'Tutup Detail' diklik");
+        switchMode('LIST');
+    });
+
+    // Search & Pagination Controls
     document.getElementById('search-input').addEventListener('input', handleSearchInput);
     document.getElementById('btn-clear-search').addEventListener('click', clearSearch);
     document.getElementById('items-per-page').addEventListener('change', handleItemsPerPageChange);
@@ -498,13 +521,12 @@ function setupEventListeners() {
 
     document.getElementById('btn-clear-logs').addEventListener('click', handleClearLogs);
 
-    // Tombol Clear Terminal Monitor
     document.getElementById('btn-clear-terminal').addEventListener('click', () => {
         console.log("[UI Click] Tombol 'Clear Terminal' diklik");
         clearTerminalScreen();
     });
 
-    // Auto-expand textarea
+    // Auto-expand textarea realtime
     const bodyTextarea = document.getElementById('note-body');
     if (bodyTextarea) {
         bodyTextarea.addEventListener('input', (e) => {
@@ -554,27 +576,22 @@ function setupEventListeners() {
         if (elRes) elRes.textContent = `${viewportRes} (Screen: ${screenRes})`;
     });
 
+    // Event Delegation: Tombol Icon Aksi Baris Tabel (👁️ ✏️ 🗑️)
     document.getElementById('notes-list').addEventListener('click', (e) => {
-        const btn = e.target.closest('.btn-select-row');
-        if (btn) {
-            const globalIndex = parseInt(btn.getAttribute('data-index'), 10);
-            selectNoteRow(globalIndex);
-        }
-    });
+        const readBtn = e.target.closest('.btn-row-read');
+        const editBtn = e.target.closest('.btn-row-edit');
+        const deleteBtn = e.target.closest('.btn-row-delete');
 
-    document.getElementById('navbar-buttons').addEventListener('click', (e) => {
-        const id = e.target.id;
-        if (id === 'btn-nav-new') openNewNoteEditor();
-        else if (id === 'btn-nav-refresh') { fetchAndRenderNotes(); fetchAndRenderLogs(); }
-        else if (id === 'btn-nav-read') readSelectedNote();
-        else if (id === 'btn-nav-edit') editSelectedNote();
-        else if (id === 'btn-nav-delete') deleteSelectedNote();
-        else if (id === 'btn-nav-clear') clearSelection();
-        else if (id === 'btn-nav-apply') handleSaveNote(false);
-        else if (id === 'btn-nav-save-exit') handleSaveNote(true);
-        else if (id === 'btn-nav-reset') resetFormToInitial();
-        else if (id === 'btn-nav-cancel') switchMode('LIST');
-        else if (id === 'btn-nav-close') switchMode('LIST');
+        if (readBtn) {
+            const index = parseInt(readBtn.getAttribute('data-index'), 10);
+            readNoteByIndex(index);
+        } else if (editBtn) {
+            const index = parseInt(editBtn.getAttribute('data-index'), 10);
+            editNoteByIndex(index);
+        } else if (deleteBtn) {
+            const index = parseInt(deleteBtn.getAttribute('data-index'), 10);
+            deleteNoteByIndex(index);
+        }
     });
 }
 

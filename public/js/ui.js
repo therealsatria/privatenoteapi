@@ -64,12 +64,10 @@ export function appendTerminalLine(message, type = 'info') {
 
     terminal.appendChild(div);
 
-    // Hapus baris tertua jika melebihi buffer 50 baris
     while (terminal.children.length > MAX_TERMINAL_LOGS) {
         terminal.removeChild(terminal.firstChild);
     }
 
-    // Auto-scroll ke paling bawah
     terminal.scrollTop = terminal.scrollHeight;
 }
 
@@ -264,8 +262,8 @@ export function autoExpandTextarea(element) {
  * Pengunci status tombol Simpan saat proses async sedang berjalan
  */
 export function setSaveButtonsLoading(isLoading) {
-    const btnApply = document.getElementById('btn-nav-apply');
-    const btnSaveExit = document.getElementById('btn-nav-save-exit');
+    const btnApply = document.getElementById('btn-editor-apply');
+    const btnSaveExit = document.getElementById('btn-editor-save-exit');
 
     if (btnApply) {
         btnApply.disabled = isLoading;
@@ -290,40 +288,16 @@ export function showUnlockedUI() {
 }
 
 /**
- * Merender tombol di Top Navbar secara dinamis berdasarkan Mode
+ * Merender Top Sticky Navbar sebagai Global Header & Sesi Kontrol
  */
-export function renderTopNavbar(activeMode, selectedNoteIndex) {
+export function renderTopNavbar() {
     const btnGroup = document.getElementById('navbar-buttons');
-    btnGroup.innerHTML = '';
-
-    if (activeMode === 'LIST') {
-        if (selectedNoteIndex !== null) {
-            btnGroup.innerHTML = `
-                <button type="button" id="btn-nav-read">[Baca]</button>
-                <button type="button" id="btn-nav-edit">[Edit]</button>
-                <button type="button" id="btn-nav-delete">[Hapus]</button>
-                <button type="button" id="btn-nav-clear">[Batal Pilih]</button>
-            `;
-        } else {
-            btnGroup.innerHTML = `
-                <button type="button" id="btn-nav-new">+ Catatan Baru</button>
-                <button type="button" id="btn-nav-refresh">Refresh</button>
-            `;
-        }
-    } else if (activeMode === 'EDITING') {
-        btnGroup.innerHTML = `
-            <button type="button" id="btn-nav-apply">Apply</button>
-            <button type="button" id="btn-nav-save-exit">Save & Exit</button>
-            <button type="button" id="btn-nav-reset">Reset</button>
-            <button type="button" id="btn-nav-cancel">Batal</button>
-        `;
-    } else if (activeMode === 'VIEWING') {
-        btnGroup.innerHTML = `
-            <button type="button" id="btn-nav-edit">Edit Catatan Ini</button>
-            <button type="button" id="btn-nav-delete">Hapus Catatan Ini</button>
-            <button type="button" id="btn-nav-close">Tutup Detail</button>
-        `;
-    }
+    if (!btnGroup) return;
+    
+    btnGroup.innerHTML = `
+        <button type="button" id="btn-top-change-key">Change Key</button>
+        <button type="button" id="btn-top-lock-key">Lock Vault</button>
+    `;
 }
 
 /**
@@ -364,9 +338,9 @@ export function switchModeUI(newMode) {
 }
 
 /**
- * Merender baris tabel catatan & menghitung pagination
+ * Merender baris tabel catatan dengan Icon Aksi (👁️ ✏️ 🗑️) & Pagination
  */
-export function renderNotesTable(filteredNotes, cachedNotes, selectedNoteIndex, currentPage, itemsPerPage) {
+export function renderNotesTable(filteredNotes, cachedNotes, currentPage, itemsPerPage) {
     const tbody = document.getElementById('notes-list');
     tbody.innerHTML = '';
 
@@ -387,10 +361,8 @@ export function renderNotesTable(filteredNotes, cachedNotes, selectedNoteIndex, 
 
     paginatedNotes.forEach((note) => {
         const globalIndex = cachedNotes.findIndex(c => c.id === note.id);
-        const isSelected = (selectedNoteIndex === globalIndex);
 
         const tr = document.createElement('tr');
-        if (isSelected) tr.className = 'active-row';
 
         tr.innerHTML = `
             <td><code>${note.id}</code></td>
@@ -398,7 +370,11 @@ export function renderNotesTable(filteredNotes, cachedNotes, selectedNoteIndex, 
             <td>${escapeHtml(note.tags || '-')}</td>
             <td>${escapeHtml(note.updated_at || note.created_at || '-')}</td>
             <td>
-                <button type="button" class="btn-select-row" data-index="${globalIndex}">${isSelected ? '✓ Selected' : 'Pilih'}</button>
+                <div class="action-icon-group">
+                    <button type="button" class="action-icon-btn btn-row-read" data-index="${globalIndex}" title="Baca Detail">👁️</button>
+                    <button type="button" class="action-icon-btn btn-row-edit" data-index="${globalIndex}" title="Edit Catatan">✏️</button>
+                    <button type="button" class="action-icon-btn btn-row-delete" data-index="${globalIndex}" title="Hapus Catatan">🗑️</button>
+                </div>
             </td>
         `;
         tbody.appendChild(tr);

@@ -9,11 +9,11 @@
 </head>
 <body>
 
-    <!-- 1. TOP STICKY NAVBAR -->
+    <!-- 1. TOP STICKY NAVBAR (GLOBAL HEADER) -->
     <div id="top-navbar" style="display: none;">
         <span class="brand-logo">private note</span>
         <div class="btn-group" id="navbar-buttons">
-            <!-- Tombol dinamis dirender via JavaScript -->
+            <!-- Tombol kontrol sesi vault dirender via JavaScript -->
         </div>
     </div>
 
@@ -45,7 +45,7 @@
 
             <br>
 
-            <!-- Form Editor Catatan (100% Fluid Responsive & Auto-Expand Textarea) -->
+            <!-- Form Editor Catatan -->
             <fieldset id="editor-fieldset" style="display: none;">
                 <legend><strong id="form-legend">Buat Catatan Baru</strong></legend>
                 <form id="note-form" onsubmit="event.preventDefault();">
@@ -67,6 +67,14 @@
                         <!-- Container Quick Tag Presets di Form Editor -->
                         <div id="editor-tag-presets" class="tag-btn-group"></div>
                     </div>
+
+                    <!-- Tombol Aksi Lokal Editor (Tepat di Bawah Form/Textarea) -->
+                    <div class="form-action-bar">
+                        <button type="button" id="btn-editor-apply" class="btn-primary">Apply</button>
+                        <button type="button" id="btn-editor-save-exit" class="btn-primary">Save & Exit</button>
+                        <button type="button" id="btn-editor-reset">Reset</button>
+                        <button type="button" id="btn-editor-cancel">Batal</button>
+                    </div>
                 </form>
             </fieldset>
 
@@ -80,6 +88,13 @@
                 <p><strong>UUID:</strong> <code id="view-uuid"></code></p>
                 <hr>
                 <pre id="view-body"></pre>
+
+                <!-- Tombol Aksi Lokal Viewer (Tepat di Bawah Detail Catatan) -->
+                <div class="form-action-bar">
+                    <button type="button" id="btn-viewer-edit" class="btn-primary">Edit Catatan Ini</button>
+                    <button type="button" id="btn-viewer-delete" class="btn-danger-outline">Hapus Catatan Ini</button>
+                    <button type="button" id="btn-viewer-close">Tutup Detail</button>
+                </div>
             </fieldset>
 
             <br id="viewer-br" style="display: none;">
@@ -88,15 +103,18 @@
             <fieldset id="list-fieldset">
                 <legend><strong>Daftar Catatan</strong></legend>
                 
-                <!-- Filter Title-Only & Pagination Size -->
-                <div class="filter-container">
-                    <div>
-                        <label for="search-input"><strong>Cari Judul:</strong> </label>
-                        <input type="text" id="search-input" placeholder="Ketik kata kunci..." style="width: 200px;">
-                        <button type="button" id="btn-clear-search">Clear</button>
+                <!-- Toolbar Atas Tabel (Tombol Baru, Refresh, Cari, & Baris/Halaman) -->
+                <div class="table-toolbar">
+                    <div class="toolbar-left">
+                        <button type="button" id="btn-list-new" class="btn-primary">+ Catatan Baru</button>
+                        <button type="button" id="btn-list-refresh">Refresh</button>
                     </div>
-                    <div>
-                        <label for="items-per-page"><strong>Baris/Halaman:</strong> </label>
+                    <div class="toolbar-right">
+                        <label for="search-input"><strong>Cari:</strong> </label>
+                        <input type="text" id="search-input" placeholder="Judul..." style="width: 160px;">
+                        <button type="button" id="btn-clear-search">Clear</button>
+
+                        <label for="items-per-page" style="margin-left: 10px;"><strong>Baris:</strong> </label>
                         <select id="items-per-page">
                             <option value="10">10</option>
                             <option value="30">30</option>
@@ -106,7 +124,7 @@
                     </div>
                 </div>
 
-                <!-- Container Quick Tag Filters di Atas Tabel Daftar Catatan -->
+                <!-- Container Quick Tag Filters -->
                 <div class="tag-filter-bar">
                     <strong style="font-size: 0.85em;">Filter Tag:</strong>
                     <div id="list-tag-filter-buttons" class="tag-btn-group" style="margin-top: 0;"></div>
@@ -120,8 +138,8 @@
                                 <th style="width: 280px;">UUID (ID)</th>
                                 <th>Judul (Decrypted)</th>
                                 <th>Tags</th>
-                                <th style="width: 180px;">Diperbarui / Dibuat</th>
-                                <th style="width: 80px;">Pilih</th>
+                                <th style="width: 170px;">Diperbarui / Dibuat</th>
+                                <th style="width: 110px;">Aksi</th>
                             </tr>
                         </thead>
                         <tbody id="notes-list">
@@ -176,7 +194,7 @@
                     <button type="button" id="btn-clear-terminal" class="tag-btn">Clear Terminal</button>
                 </div>
                 <div id="terminal-screen" class="terminal-container">
-                    <!-- Baris terminal dirender dinamis lewat JS Interceptor -->
+                    <!-- Baris terminal dirender dinamis -->
                 </div>
             </fieldset>
 
