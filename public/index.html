@@ -9,11 +9,15 @@
 </head>
 <body>
 
-    <!-- 1. TOP STICKY NAVBAR (GLOBAL HEADER) -->
+    <!-- 1. TOP STICKY NAVBAR (GLOBAL HEADER PERMANEN) -->
     <div id="top-navbar" style="display: none;">
-        <span class="brand-logo">private note</span>
+        <div class="navbar-left">
+            <span class="brand-logo">private note</span>
+            <span class="status-indicator">● Unlocked</span>
+        </div>
         <div class="btn-group" id="navbar-buttons">
-            <!-- Tombol kontrol sesi vault dirender via JavaScript -->
+            <button type="button" id="btn-top-change-key">Change Key</button>
+            <button type="button" id="btn-top-lock-key">Lock Vault</button>
         </div>
     </div>
 
@@ -43,16 +47,6 @@
 
         <!-- 3. UTAMA APLIKASI (SAAT TERBUKA) -->
         <div id="app-section" style="display: none;">
-            
-            <!-- Status Sesi Vault -->
-            <fieldset>
-                <legend><strong>Status Sesi Vault</strong></legend>
-                <p>Status: <strong style="color: green;">Vault Terbuka (Unlocked)</strong></p>
-                <button type="button" id="btn-change-key">Change Key</button>
-                <button type="button" id="btn-lock-key">Lock / Release Key</button>
-            </fieldset>
-
-            <br>
 
             <!-- Form Editor Catatan -->
             <fieldset id="editor-fieldset" style="display: none;">
