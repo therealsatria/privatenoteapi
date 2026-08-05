@@ -24,6 +24,12 @@ body {
     gap: 10px;
 }
 
+#top-navbar .navbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
 /* Branding Judul "private note" */
 #top-navbar .brand-logo {
     font-size: 0.95em;
@@ -31,6 +37,14 @@ body {
     color: #4da6ff;
     letter-spacing: 0.5px;
     text-transform: lowercase;
+    white-space: nowrap;
+}
+
+/* Indikator Teks Hijau "● Unlocked" di Top Navbar */
+#top-navbar .status-indicator {
+    font-size: 0.82em;
+    color: #00ff66;
+    font-weight: bold;
     white-space: nowrap;
 }
 
@@ -180,7 +194,6 @@ th {
     background-color: #eee;
 }
 
-/* Tombol Icon Aksi di Kolom Tabel */
 .action-icon-group {
     display: flex;
     gap: 6px;
