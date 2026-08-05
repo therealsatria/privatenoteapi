@@ -23,10 +23,19 @@
         <div id="lock-section">
             <fieldset>
                 <legend><strong>Vault Terkunci</strong></legend>
-                <p>Masukkan Secret Key / Passphrase Anda untuk membuka dan mendekripsi catatan:</p>
+                <p>Masukkan Gateway Key API & Secret Key / Passphrase Anda untuk membuka vault:</p>
                 <form id="unlock-form">
-                    <label for="passphrase-input">Passphrase / Key:</label>
-                    <input type="password" id="passphrase-input" placeholder="Masukkan Passphrase..." required style="width: 250px;">
+                    <div>
+                        <label for="gateway-key-input">Gateway Key (API Passcode):</label><br>
+                        <input type="password" id="gateway-key-input" placeholder="Masukkan Gateway Key..." style="width: 250px;">
+                        <small style="color: #666; display: block; margin-top: 2px;">*Kosongkan jika GATEWAY_KEY tidak di-set di Vercel.</small>
+                    </div>
+                    <br>
+                    <div>
+                        <label for="passphrase-input">Passphrase / Key (Vault Master Key):</label><br>
+                        <input type="password" id="passphrase-input" placeholder="Masukkan Vault Passphrase..." required style="width: 250px;">
+                    </div>
+                    <br>
                     <button type="submit">Set Key / Unlock</button>
                 </form>
             </fieldset>
@@ -103,7 +112,7 @@
             <fieldset id="list-fieldset">
                 <legend><strong>Daftar Catatan</strong></legend>
                 
-                <!-- Toolbar Atas Tabel (Tombol Baru, Refresh, Cari, & Baris/Halaman) -->
+                <!-- Toolbar Atas Tabel -->
                 <div class="table-toolbar">
                     <div class="toolbar-left">
                         <button type="button" id="btn-list-new" class="btn-primary">+ Catatan Baru</button>
@@ -177,7 +186,7 @@
                         </tbody>
                     </table>
                 </div>
-                <!-- Action Bar Log: Info Total Data & Tombol Clear -->
+                <!-- Action Bar Log -->
                 <div class="logs-action-bar">
                     <span id="logs-total-info">Total Log: 0 Data</span>
                     <button type="button" id="btn-clear-logs" class="btn-danger-outline">Clear All Logs</button>

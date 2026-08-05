@@ -279,6 +279,13 @@ export function showLockedUI() {
     document.getElementById('lock-section').style.display = 'block';
     document.getElementById('app-section').style.display = 'none';
     document.getElementById('top-navbar').style.display = 'none';
+
+    // Pre-fill Gateway Key jika sudah pernah disimpan di sessionStorage
+    const storedGatewayKey = sessionStorage.getItem('private_notes_gateway_key');
+    const gatewayInput = document.getElementById('gateway-key-input');
+    if (gatewayInput && storedGatewayKey) {
+        gatewayInput.value = storedGatewayKey;
+    }
 }
 
 export function showUnlockedUI() {

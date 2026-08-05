@@ -2,6 +2,29 @@ import { neon } from '@neondatabase/serverless';
 
 let isTableInitialized = false;
 
+// IN-MEMORY RATE LIMITER (Solusi 3)
+const rateLimitMap = new Map();
+const RATE_LIMIT_MAX = 30;              // Maksimal 30 request per menit per IP
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // Jendela waktu 1 Menit (60.000 ms)
+
+/**
+ * Memeriksa apakah IP Address tertentu melebihi batas request
+ */
+function isRateLimitExceeded(ip) {
+  const now = Date.now();
+  const record = rateLimitMap.get(ip) || { count: 0, resetTime: now + RATE_LIMIT_WINDOW_MS };
+
+  if (now > record.resetTime) {
+    record.count = 1;
+    record.resetTime = now + RATE_LIMIT_WINDOW_MS;
+  } else {
+    record.count += 1;
+  }
+
+  rateLimitMap.set(ip, record);
+  return record.count > RATE_LIMIT_MAX;
+}
+
 /**
  * Membuat tabel 'notes' & 'logs' serta menambahkan kolom 'hostname' jika belum ada
  */
@@ -34,7 +57,6 @@ async function ensureTableExists(sql) {
     );
   `;
 
-  // Pastikan kolom hostname ada jika tabel logs sudah dibuat sebelumnya
   await sql`
     ALTER TABLE logs ADD COLUMN IF NOT EXISTS hostname TEXT;
   `;
@@ -82,7 +104,6 @@ function getClientGeoAndHostInfo(req) {
   const ua = req.headers['user-agent'] || '';
   const deviceInfo = parseUserAgent(ua);
   
-  // Format Hostname: domain.vercel.app (Chrome on Windows)
   const hostname = `${host} (${deviceInfo})`;
 
   return { ip, region, hostname };
@@ -95,13 +116,11 @@ async function logActivity(sql, req, actionType, noteId = null) {
   try {
     const { ip, region, hostname } = getClientGeoAndHostInfo(req);
 
-    // 1. Simpan Log Baru
     await sql`
       INSERT INTO logs (note_id, action_type, ip_address, region, hostname)
       VALUES (${noteId ? noteId : null}, ${actionType}, ${ip}, ${region}, ${hostname})
     `;
 
-    // 2. LAZY CLEANUP: Otomatis hapus log yang berusia lebih dari 3 bulan (90 hari)
     await sql`
       DELETE FROM logs WHERE created_at < NOW() - INTERVAL '3 months'
     `;
@@ -114,10 +133,36 @@ export default async function handler(req, res) {
   // Header CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, x-gateway-key');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
+  }
+
+  const clientGeo = getClientGeoAndHostInfo(req);
+
+  // --------------------------------------------------------------------------
+  // SOLUSI 3: PROTEKSI RATE LIMITING (Max 30 Req/Menit per IP)
+  // --------------------------------------------------------------------------
+  if (isRateLimitExceeded(clientGeo.ip)) {
+    return res.status(429).json({
+      status: 'error',
+      message: 'Too Many Requests: Batas maksimum request API (30x/menit) terlampaui. Silakan tunggu 1 menit.'
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // SOLUSI 2: PROTEKSI GATEWAY KEY (Hanya Diproses Jika GATEWAY_KEY Cocok)
+  // --------------------------------------------------------------------------
+  const expectedGatewayKey = process.env.GATEWAY_KEY;
+  const clientGatewayKey = req.headers['x-gateway-key'] || req.query.gateway_key;
+
+  // Jika GATEWAY_KEY di-set di Vercel Environment Variables, maka wajib dicocokkan!
+  if (expectedGatewayKey && clientGatewayKey !== expectedGatewayKey) {
+    return res.status(401).json({
+      status: 'error',
+      message: 'Unauthorized: Gateway Key API tidak valid atau belum diisi.'
+    });
   }
 
   const sql = neon(process.env.DATABASE_URL);
@@ -143,21 +188,20 @@ export default async function handler(req, res) {
       // ACTION: PING
       // ----------------------------------------------------------------------
       case 'ping': {
-        const geoHost = getClientGeoAndHostInfo(req);
         return res.status(200).json({
           status: 'success',
           message: 'pong',
           data: {
-            ip: geoHost.ip,
-            region: geoHost.region,
-            hostname: geoHost.hostname,
+            ip: clientGeo.ip,
+            region: clientGeo.region,
+            hostname: clientGeo.hostname,
             server_time: Date.now()
           }
         });
       }
 
       // ----------------------------------------------------------------------
-      // ACTION: LOG VAULT EVENT (Mencatat SET_KEY, CHANGE_KEY, RELEASE_KEY)
+      // ACTION: LOG VAULT EVENT
       // ----------------------------------------------------------------------
       case 'log_vault_event': {
         if (req.method !== 'POST') return res.status(405).json({ status: 'error', message: 'Method Not Allowed' });

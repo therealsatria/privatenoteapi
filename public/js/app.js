@@ -41,7 +41,7 @@ let cachedNotes = [];
 let filteredNotes = [];
 
 let activeMode = 'LIST'; // Options: 'LIST' | 'EDITING' | 'VIEWING'
-let activeNoteIndex = null; // Indeks catatan yang sedang aktif dibuka/diedit
+let activeNoteIndex = null;
 let originalFormData = { title: '', body: '', tags: '' };
 
 // Tag Filter State
@@ -87,20 +87,28 @@ async function initApp() {
             handleLock();
         }
     } else {
-        console.log("[Vault] Status Vault: TERKUNCI (Menunggu Passphrase)");
+        console.log("[Vault] Status Vault: TERKUNCI (Menunggu Passphrase & Gateway Key)");
         showLockedUI();
     }
 }
 
-// Vault Locking & Session Management
+// Vault Locking & Session Management (Mendukung Gateway Key & Passphrase)
 async function handleUnlock(event) {
     if (event) event.preventDefault();
     console.log("[UI Click] Tombol 'Set Key / Unlock' diklik");
     
-    const input = document.getElementById('passphrase-input').value.trim();
-    if (!input) return alert("Passphrase wajib diisi!");
+    const passphraseInput = document.getElementById('passphrase-input').value.trim();
+    const gatewayInput = document.getElementById('gateway-key-input');
+    const gatewayKey = gatewayInput ? gatewayInput.value.trim() : '';
 
-    sessionStorage.setItem('private_notes_passphrase', input);
+    if (!passphraseInput) return alert("Passphrase Vault wajib diisi!");
+
+    // Simpan Gateway Key & Passphrase ke Session Storage
+    sessionStorage.setItem('private_notes_passphrase', passphraseInput);
+    if (gatewayKey) {
+        sessionStorage.setItem('private_notes_gateway_key', gatewayKey);
+    }
+
     document.getElementById('passphrase-input').value = '';
     
     console.log("[Vault] Mengirim log event 'SET_KEY'...");
@@ -123,7 +131,7 @@ async function handleLock() {
     
     switchMode('LIST');
     showLockedUI();
-    console.log("[Vault] Vault berhasil dikunci. RAM & Session cleared.");
+    console.log("[Vault] Vault berhasil dikunci. RAM & Passphrase Session cleared.");
 }
 
 async function handleChangeKey() {
@@ -458,7 +466,7 @@ async function executePing() {
     } catch (err) {
         lastPingMs = null;
         lastPingStatusClass = 'red';
-        console.warn("[Network] PING Heartbeat Gagal - Server Unreachable");
+        console.warn("[Network] PING Heartbeat Gagal - Server Unreachable / Gateway Unauthorized");
     }
 }
 
@@ -474,16 +482,12 @@ function setupEventListeners() {
     isEventListenersBound = true;
 
     document.getElementById('unlock-form').addEventListener('submit', handleUnlock);
-    document.getElementById('btn-change-key').addEventListener('click', handleChangeKey);
-    document.getElementById('btn-lock-key').addEventListener('click', handleLock);
 
-    // Top Sticky Navbar Controls (Global Session Header)
     document.getElementById('navbar-buttons').addEventListener('click', (e) => {
         if (e.target.id === 'btn-top-change-key') handleChangeKey();
         else if (e.target.id === 'btn-top-lock-key') handleLock();
     });
 
-    // Toolbar Atas Tabel (+ Catatan Baru & Refresh)
     document.getElementById('btn-list-new').addEventListener('click', openNewNoteEditor);
     document.getElementById('btn-list-refresh').addEventListener('click', () => {
         console.log("[UI Click] Tombol 'Refresh' diklik");
@@ -491,7 +495,6 @@ function setupEventListeners() {
         fetchAndRenderLogs();
     });
 
-    // Form Editor Local Action Buttons (Tepat di Bawah Form/Textarea)
     document.getElementById('btn-editor-apply').addEventListener('click', () => handleSaveNote(false));
     document.getElementById('btn-editor-save-exit').addEventListener('click', () => handleSaveNote(true));
     document.getElementById('btn-editor-reset').addEventListener('click', resetFormToInitial);
@@ -500,7 +503,6 @@ function setupEventListeners() {
         switchMode('LIST');
     });
 
-    // Viewer Local Action Buttons (Tepat di Bawah Detail Catatan)
     document.getElementById('btn-viewer-edit').addEventListener('click', () => {
         if (activeNoteIndex !== null) editNoteByIndex(activeNoteIndex);
     });
@@ -512,7 +514,6 @@ function setupEventListeners() {
         switchMode('LIST');
     });
 
-    // Search & Pagination Controls
     document.getElementById('search-input').addEventListener('input', handleSearchInput);
     document.getElementById('btn-clear-search').addEventListener('click', clearSearch);
     document.getElementById('items-per-page').addEventListener('change', handleItemsPerPageChange);
@@ -526,7 +527,6 @@ function setupEventListeners() {
         clearTerminalScreen();
     });
 
-    // Auto-expand textarea realtime
     const bodyTextarea = document.getElementById('note-body');
     if (bodyTextarea) {
         bodyTextarea.addEventListener('input', (e) => {
@@ -534,7 +534,6 @@ function setupEventListeners() {
         });
     }
 
-    // Sinkronisasi tombol preset tag
     const tagsInput = document.getElementById('note-tags');
     if (tagsInput) {
         tagsInput.addEventListener('input', () => {
@@ -542,7 +541,6 @@ function setupEventListeners() {
         });
     }
 
-    // Event Delegation: Preset Tag Editor
     const editorTagContainer = document.getElementById('editor-tag-presets');
     if (editorTagContainer) {
         editorTagContainer.addEventListener('click', (e) => {
@@ -555,7 +553,6 @@ function setupEventListeners() {
         });
     }
 
-    // Event Delegation: Tag Filter Daftar Catatan
     const listTagFilterContainer = document.getElementById('list-tag-filter-buttons');
     if (listTagFilterContainer) {
         listTagFilterContainer.addEventListener('click', (e) => {
@@ -576,7 +573,6 @@ function setupEventListeners() {
         if (elRes) elRes.textContent = `${viewportRes} (Screen: ${screenRes})`;
     });
 
-    // Event Delegation: Tombol Icon Aksi Baris Tabel (👁️ ✏️ 🗑️)
     document.getElementById('notes-list').addEventListener('click', (e) => {
         const readBtn = e.target.closest('.btn-row-read');
         const editBtn = e.target.closest('.btn-row-edit');
