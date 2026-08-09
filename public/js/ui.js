@@ -373,7 +373,7 @@ export function renderNotesTable(filteredNotes, cachedNotes, currentPage, itemsP
         tr.innerHTML = `
             <td style='display:none;'><code>${note.id}</code></td>
             <td>${escapeHtml(note.title)}</td>
-            <td>${escapeHtml(note.tags || '-')}</td>
+            <td><code>${escapeHtml(note.tags || '-')}</code></td>
             <td>${escapeHtml(note.updated_at || note.created_at || '-')}</td>
             <td>
                 <div class="action-icon-group">
