@@ -371,7 +371,7 @@ export function renderNotesTable(filteredNotes, cachedNotes, currentPage, itemsP
         const tr = document.createElement('tr');
 
         tr.innerHTML = `
-            <td><code>${note.id}</code></td>
+            <td style='display:none;'><code>${note.id}</code></td>
             <td>${escapeHtml(note.title)}</td>
             <td>${escapeHtml(note.tags || '-')}</td>
             <td>${escapeHtml(note.updated_at || note.created_at || '-')}</td>
