@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>private note</title>
+    <title>private note - Zero-Knowledge Vault</title>
     <!-- Import File Stylesheets CSS -->
     <link rel="stylesheet" href="css/styles.css">
 </head>
@@ -106,11 +106,12 @@
             <fieldset id="list-fieldset">
                 <legend><strong>Daftar Catatan</strong></legend>
                 
-                <!-- Toolbar Atas Tabel -->
+                <!-- Toolbar Atas Tabel (+ Export Button) -->
                 <div class="table-toolbar">
                     <div class="toolbar-left">
                         <button type="button" id="btn-list-new" class="btn-primary">+ Catatan Baru</button>
                         <button type="button" id="btn-list-refresh">Refresh</button>
+                        <button type="button" id="btn-list-export" title="Export seluruh catatan ke file JSON (Plaintext)">📥 Export JSON</button>
                     </div>
                     <div class="toolbar-right">
                         <label for="search-input"><strong>Cari:</strong> </label>
@@ -138,8 +139,7 @@
                     <table>
                         <thead>
                             <tr>
-                                <!-- <th style="width: 280px;">UUID (ID)</th> -->
-                                <th style='display:none;'>UUID</th>
+                                <th style="width: 280px;">UUID (ID)</th>
                                 <th>Judul (Decrypted)</th>
                                 <th>Tags</th>
                                 <th style="width: 170px;">Diperbarui / Dibuat</th>

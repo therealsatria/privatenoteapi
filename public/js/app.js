@@ -29,7 +29,8 @@ import {
     toggleTagInInput,
     updateEditorTagButtonStates,
     setupConsoleInterceptor,
-    clearTerminalScreen
+    clearTerminalScreen,
+    downloadPlaintextJson
 } from './ui.js';
 
 // KONFIGURASI FLEKSIBEL: Jumlah baris log aktivitas yang ditampilkan
@@ -103,7 +104,6 @@ async function handleUnlock(event) {
 
     if (!passphraseInput) return alert("Passphrase Vault wajib diisi!");
 
-    // Simpan Gateway Key & Passphrase ke Session Storage
     sessionStorage.setItem('private_notes_passphrase', passphraseInput);
     if (gatewayKey) {
         sessionStorage.setItem('private_notes_gateway_key', gatewayKey);
@@ -495,9 +495,25 @@ function setupEventListeners() {
         fetchAndRenderLogs();
     });
 
+    // Listener Tombol Export JSON Plaintext
+    const exportBtn = document.getElementById('btn-list-export');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', () => {
+            console.log("[UI Click] Tombol 'Export JSON' diklik");
+            if (!cachedNotes || cachedNotes.length === 0) {
+                return alert("Tidak ada catatan untuk di-export!");
+            }
+            const confirmExport = confirm("SECURITY WARNING:\nFile yang di-export berisi seluruh catatan dalam format TEKS BIASA (UNENCRYPTED).\n\nApakah Anda yakin ingin mengunduh file backup ini?");
+            if (confirmExport) {
+                downloadPlaintextJson(cachedNotes);
+                console.log(`[Export] Berhasil mengunduh ${cachedNotes.length} catatan versi Plaintext JSON`);
+            }
+        });
+    }
+
     document.getElementById('btn-editor-apply').addEventListener('click', () => handleSaveNote(false));
     document.getElementById('btn-editor-save-exit').addEventListener('click', () => handleSaveNote(true));
-    document.getElementById('btn-editor-reset').addEventListener('click', resetFormToInitial);
+    document.getElementById('btn-editor-reset').addEventListener('click', resetFormToInitial();
     document.getElementById('btn-editor-cancel').addEventListener('click', () => {
         console.log("[UI Click] Tombol 'Batal Editor' diklik");
         switchMode('LIST');

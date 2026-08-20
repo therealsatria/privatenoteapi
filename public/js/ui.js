@@ -80,6 +80,52 @@ export function clearTerminalScreen() {
 }
 
 /**
+ * Memformat dan mengunduh data catatan terdekripsi dalam format JSON Plaintext
+ */
+export function downloadPlaintextJson(cachedNotes) {
+    if (!cachedNotes || cachedNotes.length === 0) {
+        alert("Tidak ada catatan untuk di-export!");
+        return;
+    }
+
+    // Format JSON Ekspor Sesuai Spesifikasi Sampel
+    const exportObj = {
+        version: "1.0",
+        app: "private note - Zero-Knowledge Vault",
+        export_type: "plaintext_notes",
+        warning: "SECURITY NOTICE: This file contains unencrypted plaintext notes.",
+        exported_at: new Date().toISOString(),
+        total_records: cachedNotes.length,
+        data: cachedNotes.map(note => ({
+            id: note.id,
+            title: note.title,
+            body: note.body,
+            tags: note.tags || null,
+            created_at: note.created_at,
+            updated_at: note.updated_at
+        }))
+    };
+
+    const jsonString = JSON.stringify(exportObj, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const filename = `notes-plaintext-${year}-${month}-${day}.json`;
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+/**
  * Mengambil 1 emoji secara acak dari daftar EMOJI_LIST
  */
 export function getRandomEmoji() {
@@ -371,9 +417,9 @@ export function renderNotesTable(filteredNotes, cachedNotes, currentPage, itemsP
         const tr = document.createElement('tr');
 
         tr.innerHTML = `
-            <td style='display:none;'><code>${note.id}</code></td>
+            <td><code>${note.id}</code></td>
             <td>${escapeHtml(note.title)}</td>
-            <td><code>${escapeHtml(note.tags || '-')}</code></td>
+            <td>${escapeHtml(note.tags || '-')}</td>
             <td>${escapeHtml(note.updated_at || note.created_at || '-')}</td>
             <td>
                 <div class="action-icon-group">
