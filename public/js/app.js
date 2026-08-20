@@ -513,7 +513,7 @@ function setupEventListeners() {
 
     document.getElementById('btn-editor-apply').addEventListener('click', () => handleSaveNote(false));
     document.getElementById('btn-editor-save-exit').addEventListener('click', () => handleSaveNote(true));
-    document.getElementById('btn-editor-reset').addEventListener('click', resetFormToInitial();
+    document.getElementById('btn-editor-reset').addEventListener('click', resetFormToInitial);
     document.getElementById('btn-editor-cancel').addEventListener('click', () => {
         console.log("[UI Click] Tombol 'Batal Editor' diklik");
         switchMode('LIST');
